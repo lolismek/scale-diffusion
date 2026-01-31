@@ -1,0 +1,16 @@
+.opal-logo {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 6px;
+  line-height: 1;
+  letter-spacing: -2px;
+  white-space: pre;
+  background: linear-gradient(180deg, #ffb89f 0%, #ff9d77 40%, #e67a5c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  user-select: none;
+  display: block;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+}

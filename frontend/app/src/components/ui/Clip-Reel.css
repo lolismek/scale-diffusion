@@ -1,0 +1,134 @@
+.Clip-Reel-container {
+  height: 100vh;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.Clip-Reel-container::-webkit-scrollbar {
+  display: none;
+}
+
+.Clip-Reel-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 10rem 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .Clip-Reel-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .Clip-Reel-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.Clip-Reel-column {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.Clip-Reel-image {
+  position: relative;
+  height: 15rem;
+  width: 100%;
+  object-fit: cover;
+  object-position: left top;
+  border-radius: 12px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(217, 119, 87, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s ease;
+}
+
+.Clip-Reel-image:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6),
+              0 0 30px rgba(217, 119, 87, 0.3);
+}
+
+/* Wrapper for border glow effect */
+.Clip-Reel-image-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+
+  --glow-x: 50%;
+  --glow-y: 50%;
+  --glow-intensity: 0;
+  --glow-radius: 200px;
+}
+
+/* Border glow effect - follows mouse */
+.Clip-Reel-image-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 6px;
+  background: radial-gradient(
+    var(--glow-radius) circle at var(--glow-x) var(--glow-y),
+    rgba(217, 119, 87, calc(var(--glow-intensity) * 0.9)) 0%,
+    rgba(217, 119, 87, calc(var(--glow-intensity) * 0.5)) 30%,
+    transparent 60%
+  );
+  border-radius: 0.5rem;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+/* Auto-scroll for side panels */
+.parallax-auto-scroll {
+  overflow: hidden !important;
+}
+
+.parallax-auto-scroll .Clip-Reel-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0 1.5rem;
+}
+
+.parallax-auto-scroll .Clip-Reel-column > div {
+  flex-shrink: 0;
+}
+
+/* Side panels styling - single column only */
+.parallax-side .Clip-Reel-grid {
+  grid-template-columns: 1fr !important;
+  max-width: 100%;
+  padding: 5rem 1rem;
+  gap: 1.5rem;
+}
+
+.parallax-side .Clip-Reel-column {
+  gap: 1.5rem;
+}
+
+.parallax-side .Clip-Reel-image {
+  height: 15rem;
+  border-radius: 0.75rem;
+}
+
+.parallax-side .Clip-Reel-image-wrapper::after {
+  border-radius: 0.75rem;
+}

@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+body{
+  overflow: hidden;
+  margin: 0;
+  background: #000;
+  font-family: 'Inter', sans-serif;
+}
+#text {
+  position: absolute;
+  top: calc(50% - 20%);
+  left: calc(50% - 28vh);
+}
+.writing{
+  --glow: #ff6b2c;
+  display: block;
+  transform: rotate(-15deg);
+  font-family: 'Neonderthaw', cursive;
+  font-size: 14vh;
+  font-weight: 700;
+  text-align:center;
+  line-height:1;
+  color: #fff;
+  text-shadow: 0 0 0.125vh var(--glow), 0 0 0.125vh var(--glow), 0 0 0.25vh var(--glow), 0 0 0.5vh var(--glow), 0 0 0.75vh var(--glow);
+}

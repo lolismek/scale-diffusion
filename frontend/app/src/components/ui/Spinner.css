@@ -1,0 +1,26 @@
+@keyframes pulse-opacity {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-opacity-dim {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+[data-component="spinner"] {
+  color: currentColor;
+  flex-shrink: 0;
+  width: 14px;
+  aspect-ratio: 1;
+}

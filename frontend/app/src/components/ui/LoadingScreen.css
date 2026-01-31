@@ -1,0 +1,45 @@
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+}
+
+.loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.claude-loader {
+  position: relative;
+  font-size: 32px;
+  line-height: 0.85;
+  display: inline-block;
+}
+
+.claude-text {
+  margin: 0;
+  font-family: monospace;
+  color: #e8a088;
+  white-space: pre;
+}
+
+.claude-text.outline {
+  opacity: 0.2;
+}
+
+.claude-text.filled {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  filter: drop-shadow(0 0 15px rgba(232, 160, 136, 0.6));
+}
