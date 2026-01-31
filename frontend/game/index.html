@@ -261,7 +261,7 @@
         ground.material.dispose();
       }
       ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(mapSettings.width, mapSettings.depth),
+        new THREE.PlaneGeometry(10000, 10000),
         new THREE.MeshStandardMaterial({ color: mapSettings.color })
       );
       ground.rotation.x = -Math.PI / 2;
