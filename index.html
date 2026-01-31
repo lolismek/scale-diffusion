@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Block Builder</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; background: #0f0f1a; color: #e0e0e0; }
+
+    #sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: #1a1a2e;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border-right: 1px solid #2a2a4a;
+    }
+
+    #sidebar h2 {
+      font-size: 14px;
+      padding: 10px 12px 6px;
+      color: #8888cc;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #2a2a4a;
+    }
+
+    .section {
+      padding: 8px 12px;
+      border-bottom: 1px solid #16213e;
+    }
+
+    .section label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    .section input[type="number"],
+    .section input[type="color"],
+    .section input[type="text"] {
+      width: 80px;
+      padding: 3px 6px;
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 3px;
+      color: #e0e0e0;
+      font-size: 12px;
+    }
+
+    .section input[type="number"] { width: 70px; }
+    .section input[type="color"] { width: 40px; height: 24px; padding: 1px 2px; cursor: pointer; }
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+
+    #modeBtn {
+      background: #4a4aff;
+      color: #fff;
+      margin: 10px 12px;
+      width: calc(100% - 24px);
+    }
+    #modeBtn:hover { background: #5c5cff; }
+
+    .btn-export { background: #2e7d32; color: #fff; }
+    .btn-export:hover { background: #388e3c; }
+    .btn-import { background: #1565c0; color: #fff; }
+    .btn-import:hover { background: #1976d2; }
+    .btn-delete { background: #c62828; color: #fff; }
+    .btn-delete:hover { background: #d32f2f; }
+
+    #blockList {
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #blockList li {
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #16213e;
+      transition: background 0.1s;
+    }
+    #blockList li:hover { background: #16213e; }
+    #blockList li.active { background: #2a2a6e; }
+
+    #selectedSection { display: none; }
+    #selectedSection.visible { display: block; }
+
+    #canvasContainer { flex: 1; position: relative; }
+    #canvasContainer canvas { display: block; width: 100%; height: 100%; }
+
+    #modeIndicator {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .block-count {
+      font-size: 11px;
+      color: #666;
+      padding: 4px 12px;
+    }
+
+    /* AI Texture styles */
+    .ai-status {
+      font-size: 11px;
+      padding: 4px 0;
+      color: #888;
+    }
+    .ai-status.connected { color: #4caf50; }
+    .ai-status.error { color: #f44336; }
+    .ai-status.connecting { color: #ff9800; }
+
+    .btn-ai { background: #7b1fa2; color: #fff; }
+    .btn-ai:hover { background: #9c27b0; }
+    .btn-ai.active { background: #c62828; }
+    .btn-ai.active:hover { background: #d32f2f; }
+
+    .section input[type="password"],
+    .section input[type="text"] {
+      width: 100%;
+      margin-top: 2px;
+    }
+
+    #aiVideo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      object-fit: cover;
+      pointer-events: none;
+      z-index: 1;
+    }
+    #aiVideo.active { display: block; }
+
+    #modeIndicator { z-index: 2; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <button id="modeBtn">Mode: Explore</button>
+
+    <h2>Map Settings</h2>
+    <div class="section">
+      <label>Width <input type="number" id="mapWidth" value="100" min="10" max="500"></label>
+      <label>Depth <input type="number" id="mapDepth" value="100" min="10" max="500"></label>
+      <label>Color <input type="color" id="mapColor" value="#333333"></label>
+      <label>Sky <input type="color" id="skyColor" value="#000000"></label>
+    </div>
+
+    <h2>Block Defaults</h2>
+    <div class="section">
+      <label>Width <input type="number" id="defWidth" value="5" min="0.5" step="0.5"></label>
+      <label>Height <input type="number" id="defHeight" value="8" min="0.5" step="0.5"></label>
+      <label>Depth <input type="number" id="defDepth" value="5" min="0.5" step="0.5"></label>
+      <label>Color <input type="color" id="defColor" value="#888888"></label>
+    </div>
+
+    <div id="selectedSection">
+      <h2>Selected Block</h2>
+      <div class="section">
+        <label>X <input type="number" id="selX" step="0.5"></label>
+        <label>Z <input type="number" id="selZ" step="0.5"></label>
+        <label>Width <input type="number" id="selW" min="0.5" step="0.5"></label>
+        <label>Height <input type="number" id="selH" min="0.5" step="0.5"></label>
+        <label>Depth <input type="number" id="selD" min="0.5" step="0.5"></label>
+        <label>Color <input type="color" id="selColor"></label>
+        <button class="btn-delete" id="deleteBtn">Delete Block</button>
+      </div>
+    </div>
+
+    <h2>Blocks</h2>
+    <div class="block-count" id="blockCount">0 blocks</div>
+    <ul id="blockList"></ul>
+
+    <h2>Import / Export</h2>
+    <div class="section">
+      <button class="btn-export" id="exportBtn">Export JSON</button>
+      <button class="btn-import" id="importBtn" style="margin-top:4px">Import JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
+
+    <h2>AI Texture</h2>
+    <div class="section">
+      <label>API Key<input type="password" id="decartApiKey" placeholder="Decart API key"></label>
+      <label>Style Prompt<input type="text" id="aiPrompt" value="New York City realistic buildings, streets, and urban texture"></label>
+      <button class="btn-ai" id="aiToggleBtn">Enable AI Texture</button>
+      <div class="ai-status" id="aiStatus">Disconnected</div>
+    </div>
+  </div>
+
+  <div id="canvasContainer">
+    <div id="modeIndicator">Explore Mode — Click to look around</div>
+    <video id="aiVideo" autoplay playsinline muted></video>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "@decartai/sdk": "https://esm.sh/@decartai/sdk"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { createDecartClient, models } from '@decartai/sdk';
+
+    // ── State ──
+    let mode = 'explore'; // 'explore' | 'build'
+    let selectedBlockIndex = -1;
+    const blocks = []; // { x, z, width, height, depth, color, mesh }
+    const mapSettings = { width: 100, depth: 100, color: '#333333', skyColor: '#000000' };
+
+    // ── Scene setup ──
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(mapSettings.skyColor);
+    const container = document.getElementById('canvasContainer');
+    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    // ── Lighting ──
+    scene.add(new THREE.AmbientLight(0x606060));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(30, 50, 20);
+    scene.add(dirLight);
+
+    // ── Ground ──
+    let ground;
+    function createGround() {
+      if (ground) {
+        scene.remove(ground);
+        ground.geometry.dispose();
+        ground.material.dispose();
+      }
+      ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(mapSettings.width, mapSettings.depth),
+        new THREE.MeshStandardMaterial({ color: mapSettings.color })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.userData.isGround = true;
+      scene.add(ground);
+    }
+    createGround();
+
+    // ── Block management ──
+    function addBlock(x, z, w, h, d, color) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mat = new THREE.MeshStandardMaterial({ color });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x, h / 2, z);
+      mesh.userData.blockIndex = blocks.length;
+      scene.add(mesh);
+      blocks.push({ x, z, width: w, height: h, depth: d, color, mesh });
+      refreshBlockList();
+      return blocks.length - 1;
+    }
+
+    function updateBlock(index, props) {
+      const block = blocks[index];
+      if (!block) return;
+      scene.remove(block.mesh);
+      block.mesh.geometry.dispose();
+      block.mesh.material.dispose();
+
+      Object.assign(block, props);
+      const geo = new THREE.BoxGeometry(block.width, block.height, block.depth);
+      const mat = new THREE.MeshStandardMaterial({ color: block.color });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(block.x, block.height / 2, block.z);
+      mesh.userData.blockIndex = index;
+      scene.add(mesh);
+      block.mesh = mesh;
+
+      if (selectedBlockIndex === index) updateSelectionOutline();
+      refreshBlockList();
+    }
+
+    function deleteBlock(index) {
+      const block = blocks[index];
+      if (!block) return;
+      scene.remove(block.mesh);
+      block.mesh.geometry.dispose();
+      block.mesh.material.dispose();
+      blocks.splice(index, 1);
+      // Re-index
+      for (let i = 0; i < blocks.length; i++) {
+        blocks[i].mesh.userData.blockIndex = i;
+      }
+      if (selectedBlockIndex === index) deselectBlock();
+      else if (selectedBlockIndex > index) selectedBlockIndex--;
+      refreshBlockList();
+    }
+
+    // ── Selection ──
+    let selectionOutline = null;
+
+    function selectBlock(index) {
+      selectedBlockIndex = index;
+      const block = blocks[index];
+      if (!block) return;
+
+      document.getElementById('selX').value = block.x;
+      document.getElementById('selZ').value = block.z;
+      document.getElementById('selW').value = block.width;
+      document.getElementById('selH').value = block.height;
+      document.getElementById('selD').value = block.depth;
+      document.getElementById('selColor').value = block.color;
+      document.getElementById('selectedSection').classList.add('visible');
+
+      updateSelectionOutline();
+      refreshBlockList();
+    }
+
+    function deselectBlock() {
+      selectedBlockIndex = -1;
+      if (selectionOutline) {
+        scene.remove(selectionOutline);
+        selectionOutline.dispose();
+        selectionOutline = null;
+      }
+      document.getElementById('selectedSection').classList.remove('visible');
+      refreshBlockList();
+    }
+
+    function updateSelectionOutline() {
+      if (selectionOutline) {
+        scene.remove(selectionOutline);
+        selectionOutline.dispose();
+        selectionOutline = null;
+      }
+      if (selectedBlockIndex >= 0 && blocks[selectedBlockIndex]) {
+        selectionOutline = new THREE.BoxHelper(blocks[selectedBlockIndex].mesh, 0xffff00);
+        scene.add(selectionOutline);
+      }
+    }
+
+    // ── Block list UI ──
+    function refreshBlockList() {
+      const list = document.getElementById('blockList');
+      list.innerHTML = '';
+      blocks.forEach((b, i) => {
+        const li = document.createElement('li');
+        li.textContent = `Block ${i} (${b.width}×${b.height}×${b.depth})`;
+        if (i === selectedBlockIndex) li.classList.add('active');
+        li.addEventListener('click', () => selectBlock(i));
+        list.appendChild(li);
+      });
+      document.getElementById('blockCount').textContent = `${blocks.length} block${blocks.length !== 1 ? 's' : ''}`;
+    }
+
+    // ── Load scene from JSON ──
+    function loadScene(data) {
+      // Clear all blocks
+      while (blocks.length) {
+        const b = blocks.pop();
+        scene.remove(b.mesh);
+        b.mesh.geometry.dispose();
+        b.mesh.material.dispose();
+      }
+      deselectBlock();
+
+      // Apply map settings
+      if (data.map) {
+        mapSettings.width = data.map.width ?? 100;
+        mapSettings.depth = data.map.depth ?? 100;
+        mapSettings.color = data.map.color ?? '#333333';
+        mapSettings.skyColor = data.map.skyColor ?? '#000000';
+        document.getElementById('mapWidth').value = mapSettings.width;
+        document.getElementById('mapDepth').value = mapSettings.depth;
+        document.getElementById('mapColor').value = mapSettings.color;
+        document.getElementById('skyColor').value = mapSettings.skyColor;
+        scene.background = new THREE.Color(mapSettings.skyColor);
+        createGround();
+      }
+
+      // Add blocks
+      if (data.blocks) {
+        data.blocks.forEach(b => {
+          addBlock(b.x, b.z, b.width, b.height, b.depth, b.color);
+        });
+      }
+    }
+
+    // ── Camera ──
+    camera.position.set(0, 1.6, 0);
+    let yaw = 0;
+    let pitch = 0;
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+    document.addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement !== renderer.domElement) return;
+      yaw -= e.movementX * 0.002;
+      pitch -= e.movementY * 0.002;
+      pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+      euler.set(pitch, yaw, 0);
+      camera.quaternion.setFromEuler(euler);
+    });
+
+    // ── Movement ──
+    const keys = {};
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT') return;
+      keys[e.key.toLowerCase()] = true;
+    });
+    document.addEventListener('keyup', e => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // ── Mode toggle ──
+    const modeBtn = document.getElementById('modeBtn');
+    const modeIndicator = document.getElementById('modeIndicator');
+
+    function setMode(newMode) {
+      mode = newMode;
+      modeBtn.textContent = `Mode: ${mode === 'explore' ? 'Explore' : 'Build'}`;
+      if (mode === 'explore') {
+        modeIndicator.textContent = 'Explore Mode — Click to look around';
+        deselectBlock();
+      } else {
+        modeIndicator.textContent = 'Build Mode — Click ground to place, click block to select';
+        if (document.pointerLockElement) document.exitPointerLock();
+      }
+    }
+    modeBtn.addEventListener('click', () => {
+      setMode(mode === 'explore' ? 'build' : 'explore');
+    });
+
+    // ── Canvas click handler ──
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('click', (e) => {
+      if (mode === 'explore') {
+        renderer.domElement.requestPointerLock();
+        return;
+      }
+
+      // Build mode: raycast
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      // Check blocks first
+      const blockMeshes = blocks.map(b => b.mesh);
+      const blockHits = raycaster.intersectObjects(blockMeshes);
+      if (blockHits.length > 0) {
+        const idx = blockHits[0].object.userData.blockIndex;
+        selectBlock(idx);
+        return;
+      }
+
+      // Check ground
+      const groundHits = raycaster.intersectObject(ground);
+      if (groundHits.length > 0) {
+        const pt = groundHits[0].point;
+        const w = parseFloat(document.getElementById('defWidth').value) || 5;
+        const h = parseFloat(document.getElementById('defHeight').value) || 8;
+        const d = parseFloat(document.getElementById('defDepth').value) || 5;
+        const c = document.getElementById('defColor').value;
+        const idx = addBlock(Math.round(pt.x * 2) / 2, Math.round(pt.z * 2) / 2, w, h, d, c);
+        selectBlock(idx);
+      }
+    });
+
+    // ── Sidebar: Map settings ──
+    document.getElementById('mapWidth').addEventListener('input', (e) => {
+      mapSettings.width = parseFloat(e.target.value) || 100;
+      createGround();
+    });
+    document.getElementById('mapDepth').addEventListener('input', (e) => {
+      mapSettings.depth = parseFloat(e.target.value) || 100;
+      createGround();
+    });
+    document.getElementById('mapColor').addEventListener('input', (e) => {
+      mapSettings.color = e.target.value;
+      createGround();
+    });
+    document.getElementById('skyColor').addEventListener('input', (e) => {
+      mapSettings.skyColor = e.target.value;
+      scene.background = new THREE.Color(mapSettings.skyColor);
+    });
+
+    // ── Sidebar: Selected block editing ──
+    function onSelectedInput() {
+      if (selectedBlockIndex < 0) return;
+      updateBlock(selectedBlockIndex, {
+        x: parseFloat(document.getElementById('selX').value) || 0,
+        z: parseFloat(document.getElementById('selZ').value) || 0,
+        width: parseFloat(document.getElementById('selW').value) || 1,
+        height: parseFloat(document.getElementById('selH').value) || 1,
+        depth: parseFloat(document.getElementById('selD').value) || 1,
+        color: document.getElementById('selColor').value,
+      });
+    }
+
+    ['selX', 'selZ', 'selW', 'selH', 'selD', 'selColor'].forEach(id => {
+      document.getElementById(id).addEventListener('input', onSelectedInput);
+    });
+
+    document.getElementById('deleteBtn').addEventListener('click', () => {
+      if (selectedBlockIndex >= 0) deleteBlock(selectedBlockIndex);
+    });
+
+    // ── Export ──
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const data = {
+        map: { ...mapSettings },
+        blocks: blocks.map(b => ({
+          x: b.x, z: b.z, width: b.width, height: b.height, depth: b.depth, color: b.color
+        }))
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'scene.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // ── Import ──
+    const importFile = document.getElementById('importFile');
+    document.getElementById('importBtn').addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          loadScene(data);
+        } catch (err) {
+          alert('Invalid JSON file');
+        }
+      };
+      reader.readAsText(file);
+      importFile.value = '';
+    });
+
+    // ── Resize ──
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    // ── AI Texture (Decart Mirage) ──
+    let aiEnabled = false;
+    let realtimeClient = null;
+
+    const aiToggleBtn = document.getElementById('aiToggleBtn');
+    const aiStatus = document.getElementById('aiStatus');
+    const aiPromptInput = document.getElementById('aiPrompt');
+    const aiVideo = document.getElementById('aiVideo');
+
+    function setAIStatus(text, state) {
+      aiStatus.textContent = text;
+      aiStatus.className = 'ai-status' + (state ? ' ' + state : '');
+    }
+
+    async function enableAI() {
+      const apiKey = document.getElementById('decartApiKey').value.trim();
+      if (!apiKey) {
+        setAIStatus('Enter your API key first', 'error');
+        return;
+      }
+
+      setAIStatus('Connecting...', 'connecting');
+      aiToggleBtn.disabled = true;
+
+      try {
+        const client = createDecartClient({ apiKey });
+        const model = models.realtime('mirage_v2');
+
+        // Capture the Three.js canvas as a MediaStream
+        const fps = model.fps || 24;
+        const canvasStream = renderer.domElement.captureStream(fps);
+
+        realtimeClient = await client.realtime.connect(canvasStream, {
+          model,
+          onRemoteStream: (transformedStream) => {
+            aiVideo.srcObject = transformedStream;
+            aiVideo.classList.add('active');
+            setAIStatus('Connected — streaming AI texture', 'connected');
+          },
+          initialState: {
+            prompt: { text: aiPromptInput.value, enhance: true }
+          }
+        });
+
+        aiEnabled = true;
+        aiToggleBtn.textContent = 'Disable AI Texture';
+        aiToggleBtn.classList.add('active');
+      } catch (err) {
+        console.error('Decart AI connection failed:', err);
+        setAIStatus('Error: ' + err.message, 'error');
+      }
+
+      aiToggleBtn.disabled = false;
+    }
+
+    function disableAI() {
+      if (realtimeClient) {
+        realtimeClient.disconnect();
+        realtimeClient = null;
+      }
+      aiVideo.srcObject = null;
+      aiVideo.classList.remove('active');
+      aiEnabled = false;
+      aiToggleBtn.textContent = 'Enable AI Texture';
+      aiToggleBtn.classList.remove('active');
+      setAIStatus('Disconnected', '');
+    }
+
+    aiToggleBtn.addEventListener('click', () => {
+      if (aiEnabled) disableAI();
+      else enableAI();
+    });
+
+    // Live prompt update (debounced)
+    let promptTimeout = null;
+    aiPromptInput.addEventListener('input', () => {
+      if (!realtimeClient || !aiEnabled) return;
+      clearTimeout(promptTimeout);
+      promptTimeout = setTimeout(() => {
+        realtimeClient.setPrompt(aiPromptInput.value);
+        setAIStatus('Prompt updated — streaming', 'connected');
+      }, 500);
+    });
+
+    // ── Initial blocks ──
+    addBlock(10, 10, 5, 8, 5, '#888888');
+    addBlock(-10, 5, 3, 12, 3, '#888888');
+    addBlock(0, -15, 6, 6, 6, '#888888');
+
+    // ── Animation loop ──
+    const direction = new THREE.Vector3();
+    const right = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Only move when pointer is locked (prevents WASD while typing in sidebar)
+      if (document.pointerLockElement === renderer.domElement) {
+        const speed = 0.1;
+        camera.getWorldDirection(direction);
+        direction.y = 0;
+        direction.normalize();
+        right.crossVectors(direction, new THREE.Vector3(0, -1, 0)).normalize();
+
+        if (keys['w']) camera.position.add(direction.clone().multiplyScalar(speed));
+        if (keys['s']) camera.position.add(direction.clone().multiplyScalar(-speed));
+        if (keys['a']) camera.position.add(right.clone().multiplyScalar(speed));
+        if (keys['d']) camera.position.add(right.clone().multiplyScalar(-speed));
+      }
+
+      // Update selection outline
+      if (selectionOutline) selectionOutline.update();
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
