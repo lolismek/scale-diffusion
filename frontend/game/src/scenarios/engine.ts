@@ -1,7 +1,39 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { scene, camera } from '../engine';
 import { state } from '../state';
 import type { Scenario, ScenarioEntity, ScenarioState, TrajectoryPoint } from './types';
+
+// Car model loader
+const gltfLoader = new GLTFLoader();
+let carModelTemplate: THREE.Group | null = null;
+let carModelLoading = false;
+const carModelCallbacks: Array<(model: THREE.Group) => void> = [];
+
+// Load the car model once
+function loadCarModel(): Promise<THREE.Group> {
+  return new Promise((resolve) => {
+    if (carModelTemplate) {
+      resolve(carModelTemplate.clone());
+      return;
+    }
+
+    carModelCallbacks.push(resolve);
+
+    if (!carModelLoading) {
+      carModelLoading = true;
+      gltfLoader.load('/assets/classic_muscle_car.glb', (gltf) => {
+        carModelTemplate = gltf.scene;
+        // Process all callbacks waiting for the model
+        carModelCallbacks.forEach(cb => cb(carModelTemplate!.clone()));
+        carModelCallbacks.length = 0;
+      }, undefined, (error) => {
+        console.error('[Scenario] Failed to load car model:', error);
+        carModelLoading = false;
+      });
+    }
+  });
+}
 
 // Euler for camera rotation
 const euler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -20,10 +52,11 @@ export const scenarioState: ScenarioState = {
 };
 
 // Entity collision radius for player collision detection
-const PLAYER_COLLISION_RADIUS = 0.5;
+// Slightly larger to account for frame timing and fast-moving objects
+const PLAYER_COLLISION_RADIUS = 1.0;
 
-// Active entity meshes
-const entityMeshes: Map<string, THREE.Mesh> = new Map();
+// Active entity meshes (can be Mesh or Group for loaded models)
+const entityMeshes: Map<string, THREE.Object3D> = new Map();
 
 // Callbacks for UI updates
 let onStateChange: (() => void) | null = null;
@@ -37,25 +70,79 @@ function notifyStateChange(): void {
 }
 
 /**
- * Create a mesh for an entity based on its type
+ * Notify the scenario system that a collision occurred (any type)
+ * Called from collision.ts when player hits anything
  */
-function createEntityMesh(entity: ScenarioEntity): THREE.Mesh {
+export function notifyScenarioCollision(): void {
+  if (!scenarioState.activeScenario || !scenarioState.isPlaying) {
+    return;
+  }
+
+  scenarioState.collisionCount++;
+
+  // Trigger failure if this is a no-collision scenario
+  if (scenarioState.activeScenario.successCondition?.type === 'no_collision') {
+    scenarioState.hasLost = true;
+    scenarioState.isPlaying = false;
+    notifyStateChange();
+  }
+}
+
+/**
+ * Create a mesh for an entity based on its type
+ * Returns a placeholder immediately for vehicles (async loads model)
+ */
+function createEntityMesh(entity: ScenarioEntity): THREE.Object3D {
   const { width, height, depth } = entity.dimensions;
+
+  // For vehicles, create placeholder and load model async
+  if (entity.type === 'vehicle') {
+    const placeholder = new THREE.Group();
+    placeholder.userData.entityId = entity.id;
+    placeholder.userData.entityType = entity.type;
+
+    // Load car model asynchronously
+    loadCarModel().then((carModel) => {
+      // Calculate scale to fit entity dimensions
+      const box = new THREE.Box3().setFromObject(carModel);
+      const modelSize = box.getSize(new THREE.Vector3());
+
+      // Scale to match entity dimensions
+      const scaleX = width / modelSize.x;
+      const scaleY = height / modelSize.y;
+      const scaleZ = depth / modelSize.z;
+      carModel.scale.set(scaleX, scaleY, scaleZ);
+
+      // Rotate 180 degrees so front faces forward (-Z in local space)
+      carModel.rotation.y = Math.PI;
+
+      // Center the model
+      const center = box.getCenter(new THREE.Vector3());
+      carModel.position.sub(center.multiply(new THREE.Vector3(scaleX, scaleY, scaleZ)));
+
+      // Apply entity color to all meshes in the model
+      carModel.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          // Tint the material with entity color
+          if (child.material instanceof THREE.MeshStandardMaterial) {
+            child.material = child.material.clone();
+            child.material.color.set(entity.color);
+          }
+        }
+      });
+
+      placeholder.add(carModel);
+    });
+
+    return placeholder;
+  }
 
   let geometry: THREE.BufferGeometry;
   let material: THREE.Material;
 
   switch (entity.type) {
-    case 'vehicle':
-      // Simple box for vehicles
-      geometry = new THREE.BoxGeometry(width, height, depth);
-      material = new THREE.MeshStandardMaterial({
-        color: entity.color,
-        metalness: 0.3,
-        roughness: 0.7,
-      });
-      break;
-
     case 'pedestrian':
       // Cylinder for pedestrians
       geometry = new THREE.CylinderGeometry(width / 2, width / 2, height, 8);
@@ -210,7 +297,8 @@ export function startScenario(scenario: Scenario): void {
   camera.position.set(scenario.playerSpawn.x, 1.6, scenario.playerSpawn.z);
   state.yaw = scenario.playerSpawn.rotation;
   state.pitch = 0;
-  state.carSpeed = 0;
+  // Apply initial speed (defaults to 0 if not specified)
+  state.carSpeed = scenario.playerSpawn.initialSpeed ?? 0;
 
   // Apply camera rotation immediately
   euler.set(0, state.yaw, 0);
@@ -247,16 +335,29 @@ export function startScenario(scenario: Scenario): void {
 }
 
 /**
+ * Dispose of an Object3D and all its children
+ */
+function disposeObject(obj: THREE.Object3D): void {
+  obj.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry?.dispose();
+      if (child.material instanceof THREE.Material) {
+        child.material.dispose();
+      } else if (Array.isArray(child.material)) {
+        child.material.forEach(m => m.dispose());
+      }
+    }
+  });
+}
+
+/**
  * Stop the current scenario
  */
 export function stopScenario(): void {
   // Remove all entity meshes
-  for (const mesh of entityMeshes.values()) {
-    scene.remove(mesh);
-    mesh.geometry.dispose();
-    if (mesh.material instanceof THREE.Material) {
-      mesh.material.dispose();
-    }
+  for (const obj of entityMeshes.values()) {
+    scene.remove(obj);
+    disposeObject(obj);
   }
   entityMeshes.clear();
 
@@ -388,6 +489,7 @@ export function updateScenario(): void {
 
 /**
  * Check collision with scenario entities (for player movement)
+ * Note: Scenario failure is now handled by notifyScenarioCollision() called from collision.ts
  */
 export function checkScenarioEntityCollision(x: number, z: number): boolean {
   if (!scenarioState.activeScenario || !scenarioState.isPlaying) {
@@ -395,7 +497,7 @@ export function checkScenarioEntityCollision(x: number, z: number): boolean {
   }
 
   for (const entity of scenarioState.activeScenario.entities) {
-    if (entity.visible && checkEntityCollision(x, z, entity)) {
+    if (entity.visible && entity.currentPosition && checkEntityCollision(x, z, entity)) {
       return true;
     }
   }

@@ -23,7 +23,7 @@ export interface ScenarioEntity {
     depth: number;   // Z dimension
   };
   trajectory: TrajectoryPoint[];
-  mesh?: THREE.Mesh;
+  mesh?: THREE.Object3D;
   // Runtime state
   currentPosition?: { x: number; z: number };
   currentRotation?: number;
@@ -34,7 +34,8 @@ export interface ScenarioEntity {
 export interface PlayerSpawn {
   x: number;
   z: number;
-  rotation: number;  // Initial yaw in radians
+  rotation: number;    // Initial yaw in radians
+  initialSpeed?: number;  // Initial player speed in m/s (optional, defaults to 0)
 }
 
 // Scenario metadata

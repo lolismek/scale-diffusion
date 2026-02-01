@@ -1,6 +1,6 @@
 import { camera } from './engine';
 import { state } from './state';
-import { checkScenarioEntityCollision } from './scenarios';
+import { checkScenarioEntityCollision, notifyScenarioCollision } from './scenarios';
 
 // Car collision radius (distance from center to edge)
 const CAR_RADIUS = 0.5;
@@ -179,6 +179,9 @@ export function resolveMovement(
   if (!checkCollision(toX, toZ)) {
     return { x: toX, z: toZ, collided: false };
   }
+
+  // Collision detected - notify scenario system (triggers failure for no_collision scenarios)
+  notifyScenarioCollision();
 
   // Try sliding along X axis only
   if (!checkCollision(toX, fromZ)) {

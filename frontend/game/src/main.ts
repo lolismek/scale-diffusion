@@ -59,8 +59,8 @@ loadDefaultMap();
 // Animation loop
 function animate(): void {
   requestAnimationFrame(animate);
+  updateScenario();  // Update entity positions BEFORE movement collision check
   updateMovement();
-  updateScenario();
   updateTiles();
   updateOutline();
   composer.render();
