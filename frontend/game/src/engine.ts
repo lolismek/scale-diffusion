@@ -10,7 +10,7 @@ export const camera = new THREE.PerspectiveCamera(
   75,
   container.clientWidth / container.clientHeight,
   0.1,
-  1000
+  5000
 );
 camera.position.set(0, 1.6, 0);
 
