@@ -1,5 +1,6 @@
 import './style.css';
 import { composer } from './engine';
+import { updateTiles } from './tiling';
 import { state } from './state';
 import { createGround } from './ground';
 import { initBlocks, addBlock } from './blocks';
@@ -46,6 +47,7 @@ addBlock(0, -15, 6, 6, 6, '#888888');
 function animate(): void {
   requestAnimationFrame(animate);
   updateMovement();
+  updateTiles();
   updateOutline();
   composer.render();
 }

@@ -4,6 +4,7 @@ import { state } from './state';
 import { addBlock, clearBlocks } from './blocks';
 import { addBuilding, clearBuildings } from './buildings';
 import { addStreets, clearStreets } from './streets';
+import { setTileTemplate, clearTiles } from './tiling';
 import { deselectBlock } from './selection';
 import { createGround } from './ground';
 import { refreshBlockList } from './ui';
@@ -14,6 +15,7 @@ export function loadScene(data: SceneData): void {
   deselectBlock();
   clearBuildings();
   clearStreets();
+  clearTiles();
 
   if (data.map) {
     state.mapSettings.width = data.map.width ?? 100;
@@ -37,14 +39,18 @@ export function loadScene(data: SceneData): void {
     });
   }
 
-  if (data.buildings) {
-    data.buildings.forEach(b => {
-      addBuilding(b.vertices, b.height, b.color);
-    });
-  }
-
-  if (data.streets) {
-    addStreets(data.streets);
+  if (data.tileWidth && data.tileDepth) {
+    // Tiling mode: chunk manager handles buildings + streets per tile
+    setTileTemplate(data);
+  } else {
+    if (data.buildings) {
+      data.buildings.forEach(b => {
+        addBuilding(b.vertices, b.height, b.color);
+      });
+    }
+    if (data.streets) {
+      addStreets(data.streets);
+    }
   }
 
   refreshBlockList();

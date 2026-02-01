@@ -38,4 +38,6 @@ export interface SceneData {
   blocks?: Array<Omit<Block, 'mesh'>>;
   buildings?: Array<Omit<Building, 'mesh'>>;
   streets?: StreetCorridor[];
+  tileWidth?: number;
+  tileDepth?: number;
 }
