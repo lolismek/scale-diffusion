@@ -48,13 +48,16 @@ async function loadDefaultMap() {
     const data = await response.json();
     loadScene(data);
     // Position camera on a road (Z-axis street with center at X=-1102.9)
-    camera.position.set(-1099, 1.6, -900);
-    state.yaw = 0; // Face north (along +Z)
+    camera.position.set(-204.7, 1.6, -407.8);
+    state.yaw = Math.PI / 2; // Face west toward the street
   } catch (e) {
     console.warn('Could not load default map:', e);
   }
 }
 loadDefaultMap();
+
+// Coordinates overlay
+const coordsOverlay = document.getElementById('coordsOverlay')!;
 
 // Animation loop
 function animate(): void {
@@ -64,5 +67,6 @@ function animate(): void {
   updateTiles();
   updateOutline();
   composer.render();
+  coordsOverlay.textContent = `X: ${camera.position.x.toFixed(1)}  Y: ${camera.position.y.toFixed(1)}  Z: ${camera.position.z.toFixed(1)}`;
 }
 animate();

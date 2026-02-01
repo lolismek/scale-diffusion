@@ -285,3 +285,18 @@ button {
 .hud-status.paused { background: rgba(230, 81, 0, 0.8); }
 .hud-status.won { background: rgba(21, 101, 192, 0.9); font-size: 18px; }
 .hud-status.lost { background: rgba(183, 28, 28, 0.9); font-size: 18px; }
+
+/* Coordinates overlay */
+#coordsOverlay {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
