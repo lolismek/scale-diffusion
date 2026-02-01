@@ -333,19 +333,9 @@ function App() {
               ) : gameStatus}
             </span>
           </div>
-          <input
-            type="text"
-            className={`prompt-input ${hasAnimated ? 'no-anim' : ''}`}
-            value={draftPrompt}
-            onChange={(e) => setDraftPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setAiPrompt(draftPrompt)
-              }
-            }}
-            placeholder="Enter AI prompt... (press Enter to apply)"
-            spellCheck={false}
-          />
+          <div className={`prompt-input ${hasAnimated ? 'no-anim' : ''}`}>
+            {aiPrompt}
+          </div>
         </>
       )}
     </div>

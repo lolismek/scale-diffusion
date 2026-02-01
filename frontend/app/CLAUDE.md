@@ -106,7 +106,7 @@ For an input at time T, the corresponding video frame:
 
 ## Real-Time Diffusion Integration
 
-**Primary: StreamDiffusion v2** (in development by friend)
+**Primary: streamdiffusion v2** (in development by friend)
 - Will be the main diffusion backend
 - Local GPU-based processing
 
@@ -198,7 +198,7 @@ Browser (capture) --> Lambda (presigned URL) --> S3 (raw)
 ```
 
 ## TODO
-- [ ] Get stable diffusion backend (StreamDiffusion v2 or paid Decart)
+- [ ] Get stable diffusion backend (streamdiffusion v2 or paid Decart)
 - [ ] Build LangGraph pipeline (ALIGN → SPLICE → CLEAN)
 - [ ] Payout tracking DB
 - [ ] Production deployment
