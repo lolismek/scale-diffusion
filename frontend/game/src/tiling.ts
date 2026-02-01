@@ -16,7 +16,6 @@ const DASH_WIDTH = 0.3;
 const EDGE_COLOR = 0xCCCCCC;
 const EDGE_Y = 0.012;
 const EDGE_WIDTH = 0.15;
-const STRIP_LENGTH = 20;
 
 // ── Template state ───────────────────────────────────────────────────────────
 interface TileTemplate {
@@ -195,8 +194,8 @@ function countDashes(segments: [number, number][]): number {
   return n;
 }
 
-function countEdgeStrips(c: StreetCorridor): number {
-  return Math.ceil((c.end - c.start) / STRIP_LENGTH) * 2;
+function countEdgeDashes(segments: [number, number][]): number {
+  return countDashes(segments) * 2;
 }
 
 function createStreetMeshes(
@@ -209,8 +208,9 @@ function createStreetMeshes(
   let totalDashes = 0;
   let totalEdges = 0;
   for (const c of corridors) {
-    totalDashes += countDashes(clearSegments(c));
-    totalEdges += countEdgeStrips(c);
+    const segs = clearSegments(c);
+    totalDashes += countDashes(segs);
+    totalEdges += countEdgeDashes(segs);
   }
   if (totalDashes === 0 && totalEdges === 0) return { dashes: null, edges: null };
 
@@ -219,16 +219,16 @@ function createStreetMeshes(
   dashGeo.rotateX(-Math.PI / 2);
   const dashes = new THREE.InstancedMesh(
     dashGeo,
-    new THREE.MeshBasicMaterial({ color: DASH_COLOR }),
+    new THREE.MeshBasicMaterial({ color: DASH_COLOR, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
     totalDashes,
   );
   dashes.frustumCulled = false;
 
-  const edgeGeo = new THREE.PlaneGeometry(STRIP_LENGTH, EDGE_WIDTH);
+  const edgeGeo = new THREE.PlaneGeometry(DASH_LENGTH, EDGE_WIDTH);
   edgeGeo.rotateX(-Math.PI / 2);
   const edges = new THREE.InstancedMesh(
     edgeGeo,
-    new THREE.MeshBasicMaterial({ color: EDGE_COLOR }),
+    new THREE.MeshBasicMaterial({ color: EDGE_COLOR, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
     totalEdges,
   );
   edges.frustumCulled = false;
@@ -260,22 +260,19 @@ function createStreetMeshes(
       }
     }
 
-    // Edge lines (both sides, continuous through intersections)
-    const strips = Math.ceil((c.end - c.start) / STRIP_LENGTH);
-    for (let side = -1; side <= 1; side += 2) {
-      const edgeOff = side * halfW;
-      for (let s = 0; s < strips; s++) {
-        const sStart = c.start + s * STRIP_LENGTH;
-        const sEnd = Math.min(sStart + STRIP_LENGTH, c.end);
-        const sLen = sEnd - sStart;
-        const sCenter = sStart + sLen / 2;
-        const sx = sLen / STRIP_LENGTH;
-
-        if (isZ) pos.set(c.center + edgeOff + offsetX, EDGE_Y, sCenter + offsetZ);
-        else pos.set(sCenter + offsetX, EDGE_Y, c.center + edgeOff + offsetZ);
-        scale.set(sx, 1, 1);
-        mat4.compose(pos, q, scale);
-        edges.setMatrixAt(eIdx++, mat4);
+    // Edge dashes (same rhythm as center, both sides)
+    for (const [segStart, segEnd] of clearSegments(c)) {
+      let off = segStart + DASH_LENGTH / 2;
+      while (off + DASH_LENGTH / 2 <= segEnd) {
+        for (let side = -1; side <= 1; side += 2) {
+          const edgeOff = side * halfW;
+          if (isZ) pos.set(c.center + edgeOff + offsetX, EDGE_Y, off + offsetZ);
+          else pos.set(off + offsetX, EDGE_Y, c.center + edgeOff + offsetZ);
+          scale.set(1, 1, 1);
+          mat4.compose(pos, q, scale);
+          edges.setMatrixAt(eIdx++, mat4);
+        }
+        off += DASH_LENGTH + DASH_GAP;
       }
     }
   }

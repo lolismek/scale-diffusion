@@ -46,14 +46,9 @@ function countDashes(segments: [number, number][]): number {
   return count;
 }
 
-/** Count edge strip instances for a corridor (full length, not interrupted). */
-function countEdgeStrips(corridor: StreetCorridor): number {
-  // Two edge lines (left and right), each one continuous strip
-  // We break the full length into manageable segments for instancing
-  const len = corridor.end - corridor.start;
-  const STRIP_LENGTH = 20; // meters per edge strip instance
-  const strips = Math.ceil(len / STRIP_LENGTH);
-  return strips * 2; // both sides
+/** Count edge dashes for a corridor (same spacing as center dashes, both sides). */
+function countEdgeDashes(segments: [number, number][]): number {
+  return countDashes(segments) * 2;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -65,8 +60,9 @@ export function addStreets(corridors: StreetCorridor[]): void {
   let totalDashes = 0;
   let totalEdges = 0;
   for (const c of corridors) {
-    totalDashes += countDashes(clearSegments(c));
-    totalEdges += countEdgeStrips(c);
+    const segs = clearSegments(c);
+    totalDashes += countDashes(segs);
+    totalEdges += countEdgeDashes(segs);
   }
 
   if (totalDashes === 0 && totalEdges === 0) return;
@@ -75,16 +71,15 @@ export function addStreets(corridors: StreetCorridor[]): void {
   // Dashes: thin flat box (length along X by default, rotated for Z-corridors)
   const dashGeo = new THREE.PlaneGeometry(DASH_LENGTH, DASH_WIDTH);
   dashGeo.rotateX(-Math.PI / 2); // lay flat on XZ plane
-  const dashMat = new THREE.MeshBasicMaterial({ color: DASH_COLOR });
+  const dashMat = new THREE.MeshBasicMaterial({ color: DASH_COLOR, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 
   dashMesh = new THREE.InstancedMesh(dashGeo, dashMat, totalDashes);
   dashMesh.frustumCulled = false;
 
-  // Edge strips: similar plane
-  const STRIP_LENGTH = 20;
-  const edgeGeo = new THREE.PlaneGeometry(STRIP_LENGTH, EDGE_WIDTH);
+  // Edge dashes: same size as center dashes
+  const edgeGeo = new THREE.PlaneGeometry(DASH_LENGTH, EDGE_WIDTH);
   edgeGeo.rotateX(-Math.PI / 2);
-  const edgeMat = new THREE.MeshBasicMaterial({ color: EDGE_COLOR });
+  const edgeMat = new THREE.MeshBasicMaterial({ color: EDGE_COLOR, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 
   edgeMesh = new THREE.InstancedMesh(edgeGeo, edgeMat, totalEdges);
   edgeMesh.frustumCulled = false;
@@ -125,29 +120,23 @@ export function addStreets(corridors: StreetCorridor[]): void {
       }
     }
 
-    // ── Edge lines ───────────────────────────────────────────────────
-    const totalLen = c.end - c.start;
-    const strips = Math.ceil(totalLen / STRIP_LENGTH);
-    for (let side = -1; side <= 1; side += 2) {
-      const edgeOffset = side * halfW;
-      for (let s = 0; s < strips; s++) {
-        const stripStart = c.start + s * STRIP_LENGTH;
-        const stripEnd = Math.min(stripStart + STRIP_LENGTH, c.end);
-        const stripLen = stripEnd - stripStart;
-        const stripCenter = stripStart + stripLen / 2;
-
-        // Scale the strip to fit remaining length on last segment
-        const sx = stripLen / STRIP_LENGTH;
-
-        if (isZ) {
-          pos.set(c.center + edgeOffset, EDGE_Y, stripCenter);
-          scale.set(sx, 1, 1);
-        } else {
-          pos.set(stripCenter, EDGE_Y, c.center + edgeOffset);
-          scale.set(sx, 1, 1);
+    // ── Edge dashes (same rhythm as center, both sides) ──────────────
+    const edgeSegs = clearSegments(c);
+    for (const [segStart, segEnd] of edgeSegs) {
+      let offset = segStart + DASH_LENGTH / 2;
+      while (offset + DASH_LENGTH / 2 <= segEnd) {
+        for (let side = -1; side <= 1; side += 2) {
+          const edgeOffset = side * halfW;
+          if (isZ) {
+            pos.set(c.center + edgeOffset, EDGE_Y, offset);
+          } else {
+            pos.set(offset, EDGE_Y, c.center + edgeOffset);
+          }
+          scale.set(1, 1, 1);
+          mat4.compose(pos, q, scale);
+          edgeMesh.setMatrixAt(edgeIdx++, mat4);
         }
-        mat4.compose(pos, q, scale);
-        edgeMesh.setMatrixAt(edgeIdx++, mat4);
+        offset += DASH_LENGTH + DASH_GAP;
       }
     }
   }
