@@ -1,0 +1,16 @@
+# CILRS Training Requirements
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+Pillow>=9.0.0
+tqdm>=4.65.0
+tensorboard>=2.12.0
+
+# Optional: Better backbone support
+timm>=0.9.0
+
+# For data extraction script (extract_diffusion_frames.py)
+# ffmpeg must be installed on the system
+
+# For distributed training (optional)
+# torch.distributed is included with torch

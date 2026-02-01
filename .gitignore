@@ -271,3 +271,6 @@ carla_garage/carla/
 *.png
 *.mp4
 *.log
+
+carla_garage/cilrs_dataset/
+carla_garage/extracted_frames/
