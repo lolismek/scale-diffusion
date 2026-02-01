@@ -357,7 +357,7 @@ function App() {
             </span>
           </div>
           <div className={`prompt-input ${hasAnimated ? 'no-anim' : ''} ${isFullscreen ? 'hidden' : ''}`}>
-            wasd to move. avoid obstacles and drive around.
+            wasd to move. avoid obstacles and drive around. have fun!
           </div>
         </>
       )}
