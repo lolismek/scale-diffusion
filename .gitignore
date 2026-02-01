@@ -1,3 +1,5 @@
+openpilot/
+
 .env
 node_modules/
 dist/
