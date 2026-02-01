@@ -1,6 +1,6 @@
 # Scale Diffusion
 
-**Crowdsourced training data for autonomous driving—collected through gameplay.**
+**Crowdsourced training data for autonomous driving—collected through gameplay in a diffusion world model.**
 
 ![Scale Diffusion Game](images/hero.png)
 
@@ -30,7 +30,7 @@ Scale Diffusion turns data collection into a game. Players drive through AI-gene
 
 ### 1. Players Drive Through AI-Generated Streets
 
-A 3D city environment rendered with Three.js is transformed in real-time by a diffusion model, creating photorealistic driving scenarios. Players navigate using WASD controls while the system records everything.
+A 3D city environment, accurately scraped with NYC public data, is rendered with Three.js and transformed in real-time by a diffusion model, creating photorealistic driving scenarios. Players navigate using WASD controls while the system records everything.
 
 ### 2. Sessions Are Recorded & Uploaded
 
