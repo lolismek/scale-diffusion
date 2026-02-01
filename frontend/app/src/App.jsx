@@ -29,7 +29,7 @@ const ASCII_LOGO = `
 
 // System info lines
 const INFO_LINES = [
-  { label: '', value: 'anon@scale-diffusion' },
+  { label: '', value: 'opal@scale-diffusion' },
   { label: '', value: 'scale-diffusion v0.1' },
   { label: '', value: 'browser runtime' },
   { label: '', value: 'webgl 2.0' },
@@ -48,7 +48,8 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitLines, setSubmitLines] = useState([])
   const [isFadingOut, setIsFadingOut] = useState(false)
-  const [aiPrompt, setAiPrompt] = useState('New York City realistic buildings, streets, and urban texture')
+  const [aiPrompt, setAiPrompt] = useState('new york city realistic buildings, streets, and urban texture')
+  const [draftPrompt, setDraftPrompt] = useState('new york city realistic buildings, streets, and urban texture')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hasAnimated, setHasAnimated] = useState(false)
   const [gameLoaded, setGameLoaded] = useState(false)
@@ -335,9 +336,14 @@ function App() {
           <input
             type="text"
             className={`prompt-input ${hasAnimated ? 'no-anim' : ''}`}
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="Enter AI prompt..."
+            value={draftPrompt}
+            onChange={(e) => setDraftPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setAiPrompt(draftPrompt)
+              }
+            }}
+            placeholder="Enter AI prompt... (press Enter to apply)"
             spellCheck={false}
           />
         </>

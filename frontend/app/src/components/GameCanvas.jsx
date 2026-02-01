@@ -3,12 +3,18 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Spinner } from './Spinner';
 import { uploadSession } from '../utils/upload';
+import { sampleScenarios } from '../game/scenarios/sampleScenarios';
+
+// Car model loader (singleton)
+const gltfLoader = new GLTFLoader();
+let carModelTemplate = null;
 
 const SESSION_DURATION_MS = 60 * 1000; // 1 minute
 
-const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York City realistic buildings and streets', isFullscreen = false, onLoaded = () => {}, onStatusChange = () => {}, onTimerUpdate = () => {}, walletAddress = '' }, ref) => {
+const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york city realistic buildings and streets', isFullscreen = false, onLoaded = () => {}, onStatusChange = () => {}, onTimerUpdate = () => {}, walletAddress = '' }, ref) => {
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const videoRef = useRef(null);
@@ -20,6 +26,8 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
   const [aiStatus, setAiStatus] = useState('disconnected');
   const [loaded, setLoaded] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [debugMode, setDebugMode] = useState(false); // Press 'p' to toggle
+  const [debugTick, setDebugTick] = useState(0); // Forces re-render for debug info
 
   // Simple logging refs
   const sessionLogRef = useRef([]);
@@ -41,6 +49,225 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
     firstFrameTime: null,  // When we received first AI frame
     initialLatency: null,  // firstFrameTime - streamStartTime
   });
+
+  // Scenario tracking
+  const isFirstSessionRef = useRef(true);  // First session uses random scenario
+  const currentScenarioRef = useRef(null); // Current active scenario
+  const scenarioStartTimeRef = useRef(null); // When scenario playback started
+  const scenarioMeshesRef = useRef(new Map()); // Entity ID -> THREE.Mesh
+  const sceneRef = useRef(null); // Reference to THREE.Scene for adding entities
+  const gameStateRef = useRef(null); // Reference to game state for spawning
+  const debugInfoRef = useRef({ elapsed: 0, entityCount: 0, visibleCount: 0 }); // Debug info
+
+  // Create a mesh for a scenario entity
+  const createEntityMesh = (entity) => {
+    const { width, height, depth } = entity.dimensions;
+
+    // For vehicles, load GLB model
+    if (entity.type === 'vehicle') {
+      const group = new THREE.Group();
+
+      // Load car model (async)
+      if (carModelTemplate) {
+        const car = carModelTemplate.clone();
+        car.scale.set(width / 2, height / 1.5, depth / 4);
+        car.traverse((child) => {
+          if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.color.set(entity.color);
+          }
+        });
+        group.add(car);
+      } else {
+        gltfLoader.load('/assets/classic_muscle_car.glb', (gltf) => {
+          carModelTemplate = gltf.scene;
+          const car = gltf.scene.clone();
+          car.scale.set(width / 2, height / 1.5, depth / 4);
+          car.traverse((child) => {
+            if (child.isMesh) {
+              child.material = child.material.clone();
+              child.material.color.set(entity.color);
+            }
+          });
+          group.add(car);
+        });
+      }
+
+      return group;
+    }
+
+    let geometry, material;
+
+    switch (entity.type) {
+      case 'pedestrian':
+        geometry = new THREE.CylinderGeometry(width / 2, width / 2, height, 8);
+        material = new THREE.MeshStandardMaterial({
+          color: entity.color,
+          metalness: 0.1,
+          roughness: 0.9,
+        });
+        break;
+      case 'obstacle':
+      default:
+        geometry = new THREE.BoxGeometry(width, height, depth);
+        material = new THREE.MeshStandardMaterial({
+          color: entity.color,
+          metalness: 0.1,
+          roughness: 0.8,
+          emissive: new THREE.Color(entity.color),
+          emissiveIntensity: 0.3,
+        });
+        break;
+    }
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+
+  // Interpolate entity position from trajectory at given time
+  const interpolateTrajectory = (trajectory, time) => {
+    if (trajectory.length === 0) return null;
+
+    const first = trajectory[0];
+    // Before first point - entity not visible yet
+    if (time < first.time) return null;
+
+    const last = trajectory[trajectory.length - 1];
+    // At or after last point - stay at last position
+    if (trajectory.length === 1 || time >= last.time) {
+      return { x: last.x, z: last.z, rotation: last.rotation };
+    }
+
+    // Find surrounding points and interpolate
+    for (let i = 0; i < trajectory.length - 1; i++) {
+      const p1 = trajectory[i];
+      const p2 = trajectory[i + 1];
+
+      if (time >= p1.time && time < p2.time) {
+        const t = (time - p1.time) / (p2.time - p1.time);
+        return {
+          x: p1.x + (p2.x - p1.x) * t,
+          z: p1.z + (p2.z - p1.z) * t,
+          rotation: p1.rotation + (p2.rotation - p1.rotation) * t,
+        };
+      }
+    }
+
+    return { x: first.x, z: first.z, rotation: first.rotation };
+  };
+
+  // Spawn scenario entities into the scene
+  const spawnScenarioEntities = (scenario, scene, camera, state) => {
+    if (!scenario || !scene) {
+      console.log('[Scenario] Cannot spawn - missing scenario or scene');
+      return;
+    }
+
+    console.log('[Scenario] Spawning scenario:', scenario.name);
+    console.log('[Scenario] Scene children before:', scene.children.length);
+
+    // Clear any existing scenario meshes
+    for (const mesh of scenarioMeshesRef.current.values()) {
+      scene.remove(mesh);
+      mesh.geometry?.dispose();
+      mesh.material?.dispose();
+    }
+    scenarioMeshesRef.current.clear();
+
+    // Set player spawn position and rotation
+    const spawnX = scenario.playerSpawn.x;
+    const spawnZ = scenario.playerSpawn.z;
+    camera.position.set(spawnX, 1.6, spawnZ);
+    state.yaw = scenario.playerSpawn.rotation;
+    state.carSpeed = scenario.playerSpawn.initialSpeed ?? 0;
+
+    // Apply rotation immediately
+    const euler = new THREE.Euler(0, state.yaw, 0, 'YXZ');
+    camera.quaternion.setFromEuler(euler);
+
+    console.log(`[Scenario] Player spawned at (${spawnX.toFixed(0)}, ${spawnZ.toFixed(0)}) yaw=${(state.yaw * 180 / Math.PI).toFixed(0)}°`);
+    console.log(`[Scenario] Camera position after spawn:`, camera.position.x.toFixed(0), camera.position.z.toFixed(0));
+
+    // Create entity meshes
+    for (const entity of scenario.entities) {
+      const mesh = createEntityMesh(entity);
+      // Check first trajectory point to see initial position
+      if (entity.trajectory.length > 0) {
+        const first = entity.trajectory[0];
+        console.log(`[Scenario] Entity ${entity.id}: starts at t=${first.time}s, pos=(${first.x.toFixed(0)}, ${first.z.toFixed(0)})`);
+      }
+      mesh.visible = false; // Will be shown when trajectory starts
+      scene.add(mesh);
+      scenarioMeshesRef.current.set(entity.id, mesh);
+    }
+
+    console.log('[Scenario] Scene children after:', scene.children.length);
+    console.log('[Scenario] Meshes created:', scenarioMeshesRef.current.size);
+    scenarioStartTimeRef.current = performance.now();
+  };
+
+  // Clear scenario entities from scene
+  const clearScenarioEntities = () => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    for (const mesh of scenarioMeshesRef.current.values()) {
+      scene.remove(mesh);
+      mesh.geometry?.dispose();
+      mesh.material?.dispose();
+    }
+    scenarioMeshesRef.current.clear();
+    scenarioStartTimeRef.current = null;
+    console.log('[Scenario] Cleared - now free drive mode');
+  };
+
+  // Update scenario entity positions based on elapsed time
+  const updateScenarioEntities = () => {
+    const scenario = currentScenarioRef.current;
+    if (!scenario || !scenarioStartTimeRef.current) {
+      debugInfoRef.current = { elapsed: 0, entityCount: 0, visibleCount: 0, scenarioName: 'Free Drive' };
+      return;
+    }
+
+    const elapsed = (performance.now() - scenarioStartTimeRef.current) / 1000;
+
+    // Scenario duration exceeded - transition to free drive
+    if (elapsed >= scenario.duration) {
+      console.log(`[Scenario] "${scenario.name}" completed after ${scenario.duration}s - switching to free drive`);
+      clearScenarioEntities();
+      // Keep the scenario ref for upload metadata, but stop updating
+      debugInfoRef.current = { elapsed: scenario.duration.toFixed(1), entityCount: 0, visibleCount: 0, scenarioName: 'Free Drive (scenario completed)' };
+      return;
+    }
+
+    let visibleCount = 0;
+
+    for (const entity of scenario.entities) {
+      const mesh = scenarioMeshesRef.current.get(entity.id);
+      if (!mesh) continue;
+
+      const pos = interpolateTrajectory(entity.trajectory, elapsed);
+      if (pos) {
+        mesh.visible = true;
+        mesh.position.set(pos.x, entity.dimensions.height / 2, pos.z);
+        mesh.rotation.y = pos.rotation;
+        visibleCount++;
+      } else {
+        mesh.visible = false;
+      }
+    }
+
+    debugInfoRef.current = {
+      elapsed: elapsed.toFixed(1),
+      entityCount: scenario.entities.length,
+      visibleCount,
+      scenarioName: scenario.name,
+      playerPos: cameraRef.current ?
+        `${cameraRef.current.position.x.toFixed(0)}, ${cameraRef.current.position.z.toFixed(0)}` : 'N/A',
+    };
+  };
 
   // Enable AI texture via WebSocket
   const enableAI = async () => {
@@ -333,6 +560,7 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
         avgRtt: avgRtt,                                      // Average round-trip time during session
         rttSamples: rttSamples,                              // All RTT measurements with timestamps
       },
+      scenario: currentScenarioRef.current,  // Scenario used for this session (null = free drive)
       metadata: {
         duration: Date.now() - (sessionStartTimeRef.current || Date.now()),
         eventCount: allEvents.length,
@@ -388,8 +616,10 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
     recordedChunksRef.current = [];
     // Reset latency tracking (keep initial values, just clear samples)
     latencyRef.current.samples = [];
+    // Reconnects always use free drive (no scenario)
+    currentScenarioRef.current = null;
 
-    console.log('Starting new session:', sessionIdRef.current);
+    console.log('Starting new session (free drive):', sessionIdRef.current);
     startRecording();
 
     const endTime = Date.now() + SESSION_DURATION_MS;
@@ -441,9 +671,41 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
     }
   }, [loaded, onLoaded]);
 
+  // Update debug panel periodically when in debug mode
+  useEffect(() => {
+    if (!debugMode) return;
+    const interval = setInterval(() => {
+      setDebugTick(t => t + 1);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [debugMode]);
+
   // Start recording and 1-min timer when loaded
   useEffect(() => {
     if (loaded && !sessionEnded) {
+      // First session: pick a random scenario
+      // Subsequent sessions (reconnects): free drive
+      if (isFirstSessionRef.current) {
+        const randomIndex = Math.floor(Math.random() * sampleScenarios.length);
+        currentScenarioRef.current = sampleScenarios[randomIndex];
+        console.log('First session - using scenario:', currentScenarioRef.current.name);
+        isFirstSessionRef.current = false;
+
+        // Spawn scenario entities
+        if (sceneRef.current && cameraRef.current && gameStateRef.current) {
+          spawnScenarioEntities(
+            currentScenarioRef.current,
+            sceneRef.current,
+            cameraRef.current,
+            gameStateRef.current
+          );
+        }
+      } else {
+        currentScenarioRef.current = null;
+        scenarioStartTimeRef.current = null;
+        console.log('Subsequent session - free drive mode');
+      }
+
       console.log('Game loaded - starting recording and 1-min session timer');
       startRecording();
 
@@ -522,11 +784,13 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
       yaw: 0,
       pitch: 0,
     };
+    gameStateRef.current = state; // Store for scenario spawning
 
     // Scene setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#87CEEB');
     scene.fog = new THREE.Fog('#87CEEB', 100, 1500);
+    sceneRef.current = scene; // Store for scenario entities
 
     // Camera - 16:9 aspect for Decart
     const camera = new THREE.PerspectiveCamera(
@@ -608,13 +872,15 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
     fetch('/city.json')
       .then(res => res.json())
       .then(data => {
+        console.log('[City] Loading city.json...', data.buildings?.length, 'buildings');
         if (data.buildings) {
           data.buildings.forEach(b => {
             addBuilding(b.vertices, b.height, b.color);
           });
+          console.log('[City] Loaded', data.buildings.length, 'buildings');
         }
       })
-      .catch(err => console.error('Failed to load city:', err));
+      .catch(err => console.error('[City] Failed to load:', err));
 
     // Controls
     const euler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -638,6 +904,19 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
     const onKeyDown = (e) => {
       if (e.target.tagName === 'INPUT') return;
       const key = e.key.toLowerCase();
+      // Toggle debug mode with 'p' - also force-starts scenario if not loaded
+      if (key === 'p') {
+        setDebugMode(prev => {
+          const newMode = !prev;
+          // If enabling debug and not loaded yet, force-start
+          if (newMode && !loaded) {
+            console.log('[Debug] Force-starting without Decart...');
+            setLoaded(true);
+          }
+          return newMode;
+        });
+        return;
+      }
       if (!state.keys[key]) {
         state.keys[key] = true;
         logEvent('keydown', { key });
@@ -690,6 +969,7 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
     const animate = () => {
       animationId = requestAnimationFrame(animate);
       updateMovement();
+      updateScenarioEntities(); // Update NPC positions
       composer.render();
 
       // Log camera state every 10th frame (~6fps logging)
@@ -721,6 +1001,14 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
       container.removeChild(renderer.domElement);
       renderer.dispose();
       rendererRef.current = null;
+      sceneRef.current = null;
+      gameStateRef.current = null;
+      // Clean up scenario meshes
+      for (const mesh of scenarioMeshesRef.current.values()) {
+        mesh.geometry?.dispose();
+        mesh.material?.dispose();
+      }
+      scenarioMeshesRef.current.clear();
     };
   }, []);
 
@@ -735,7 +1023,7 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
       {/* Three.js canvas (renders but hidden until AI ready) */}
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* AI-processed video overlay */}
+      {/* AI-processed video overlay - hidden in debug mode */}
       <video
         ref={videoRef}
         autoPlay
@@ -749,12 +1037,44 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
           height: '100%',
           objectFit: 'cover',
           pointerEvents: 'none',
-          zIndex: aiEnabled ? 100 : -1,
+          zIndex: (aiEnabled && !debugMode) ? 100 : -1,
           background: '#000',
         }}
       />
 
-      {/* Loading overlay - black with spinner until first frame */}
+      {/* Debug panel - press 'p' to toggle */}
+      {debugMode && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 16,
+            left: 16,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            color: 'rgba(255,255,255,0.9)',
+            padding: '12px 16px',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            zIndex: 300,
+            borderRadius: 8,
+            minWidth: 180,
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <div style={{ marginBottom: 8, fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>
+            Debug · P to hide
+          </div>
+          <div style={{ marginBottom: 4 }}>{debugInfoRef.current.scenarioName || 'Free Drive'}</div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+            {debugInfoRef.current.elapsed}s · {debugInfoRef.current.visibleCount}/{debugInfoRef.current.entityCount} entities
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 4 }}>
+            pos: {debugInfoRef.current.playerPos}
+          </div>
+        </div>
+      )}
+
+      {/* Loading overlay - black with spinner until first frame (hidden in debug mode) */}
       <div
         style={{
           position: 'absolute',
@@ -764,15 +1084,15 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York
           height: '100%',
           background: '#000',
           zIndex: 200,
-          opacity: loaded ? 0 : 1,
+          opacity: (loaded || debugMode) ? 0 : 1,
           transition: 'opacity 0.8s ease-out',
-          pointerEvents: loaded ? 'none' : 'auto',
+          pointerEvents: (loaded || debugMode) ? 'none' : 'auto',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        {!loaded && (
+        {!loaded && !debugMode && (
           <Spinner style={{ width: 32, height: 32, color: '#fff', opacity: 0, animation: 'fadeIn 1s ease-out forwards' }} />
         )}
       </div>

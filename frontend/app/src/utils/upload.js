@@ -32,7 +32,7 @@ export async function testUploadApi() {
  * @returns {Promise<Object>} - Upload result with S3 keys
  */
 export async function uploadSession(bundle) {
-  const { sessionId, walletAddress, prompt, video, inputs, camera, latency, metadata } = bundle;
+  const { sessionId, walletAddress, prompt, video, inputs, camera, latency, scenario, metadata } = bundle;
 
   try {
     // 1. Upload video
@@ -81,6 +81,11 @@ export async function uploadSession(bundle) {
       walletAddress,
       prompt,
       ...metadata,
+      scenario: scenario ? {
+        id: scenario.id,
+        name: scenario.name,
+        type: scenario.type || 'free',
+      } : { id: 'free_drive', name: 'Free Drive', type: 'free' },
       latencySummary: latency ? {
         initialLatency: latency.initialLatency,
         avgRtt: latency.avgRtt,
