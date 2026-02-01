@@ -6,6 +6,15 @@ import { addBlock, updateBlock, deleteBlock } from './blocks';
 import { selectBlock, deselectBlock } from './selection';
 import { resetCarPhysics } from './controls';
 import { scene } from './engine';
+import {
+  sampleScenarios,
+  startScenario,
+  stopScenario,
+  togglePause,
+  restartScenario,
+  getScenarioInfo,
+  setOnScenarioStateChange,
+} from './scenarios';
 
 export function refreshBlockList(): void {
   const list = document.getElementById('blockList')!;
@@ -131,4 +140,153 @@ export function initUI(): void {
   document.getElementById('deleteBtn')!.addEventListener('click', () => {
     if (state.selectedBlockIndex >= 0) deleteBlock(state.selectedBlockIndex);
   });
+}
+
+/**
+ * Initialize scenario UI
+ */
+export function initScenarioUI(): void {
+  const scenarioSelect = document.getElementById('scenarioSelect') as HTMLSelectElement;
+  const startBtn = document.getElementById('scenarioStartBtn')!;
+  const stopBtn = document.getElementById('scenarioStopBtn')!;
+  const pauseBtn = document.getElementById('scenarioPauseBtn')!;
+  const restartBtn = document.getElementById('scenarioRestartBtn')!;
+  const statusDiv = document.getElementById('scenarioStatus')!;
+  const timerDiv = document.getElementById('scenarioTimer')!;
+  const collisionsDiv = document.getElementById('scenarioCollisions')!;
+  const controlsDiv = document.getElementById('scenarioControls')!;
+
+  // Populate scenario dropdown
+  sampleScenarios.forEach(scenario => {
+    const option = document.createElement('option');
+    option.value = scenario.id;
+    option.textContent = scenario.name;
+    scenarioSelect.appendChild(option);
+  });
+
+  // Update description when selection changes
+  scenarioSelect.addEventListener('change', () => {
+    const scenario = sampleScenarios.find(s => s.id === scenarioSelect.value);
+    const descEl = document.getElementById('scenarioDesc')!;
+    if (scenario) {
+      descEl.textContent = scenario.description;
+    } else {
+      descEl.textContent = 'Select a scenario to begin';
+    }
+  });
+
+  // Start scenario
+  startBtn.addEventListener('click', () => {
+    const scenario = sampleScenarios.find(s => s.id === scenarioSelect.value);
+    if (scenario) {
+      // Switch to explore mode and drive mode
+      state.mode = 'explore';
+      state.driveMode = true;
+      document.getElementById('modeBtn')!.textContent = 'Mode: Explore';
+      document.getElementById('modeIndicator')!.textContent = 'Scenario Mode — Complete the objective';
+      resetCarPhysics();
+
+      // Request pointer lock
+      renderer.domElement.requestPointerLock();
+
+      startScenario(scenario);
+    }
+  });
+
+  // Stop scenario
+  stopBtn.addEventListener('click', () => {
+    stopScenario();
+  });
+
+  // Pause/resume
+  pauseBtn.addEventListener('click', () => {
+    togglePause();
+  });
+
+  // Restart
+  restartBtn.addEventListener('click', () => {
+    restartScenario();
+    renderer.domElement.requestPointerLock();
+  });
+
+  // HUD elements
+  const hudDiv = document.getElementById('scenarioHUD')!;
+  const hudTimer = document.getElementById('hudTimer')!;
+  const hudStatus = document.getElementById('hudStatus')!;
+
+  // Update UI on state change
+  function updateScenarioUI(): void {
+    const info = getScenarioInfo();
+
+    if (!info) {
+      statusDiv.textContent = 'No active scenario';
+      statusDiv.className = 'scenario-status';
+      timerDiv.textContent = '--:--';
+      collisionsDiv.textContent = '0';
+      controlsDiv.classList.remove('visible');
+      startBtn.classList.remove('hidden');
+      hudDiv.classList.remove('visible');
+      return;
+    }
+
+    controlsDiv.classList.add('visible');
+    startBtn.classList.add('hidden');
+    hudDiv.classList.add('visible');
+
+    // Update timer
+    const mins = Math.floor(info.timeRemaining / 60);
+    const secs = Math.floor(info.timeRemaining % 60);
+    const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+    timerDiv.textContent = timeStr;
+    hudTimer.textContent = timeStr;
+
+    // Update collisions
+    collisionsDiv.textContent = info.collisions.toString();
+
+    // Update status
+    statusDiv.className = 'scenario-status';
+    hudStatus.className = 'hud-status';
+    switch (info.status) {
+      case 'playing':
+        statusDiv.textContent = `Playing: ${info.name}`;
+        statusDiv.classList.add('playing');
+        hudStatus.textContent = info.name;
+        hudStatus.classList.add('playing');
+        pauseBtn.textContent = 'Pause';
+        break;
+      case 'paused':
+        statusDiv.textContent = 'Paused';
+        statusDiv.classList.add('paused');
+        hudStatus.textContent = 'PAUSED';
+        hudStatus.classList.add('paused');
+        pauseBtn.textContent = 'Resume';
+        break;
+      case 'won':
+        statusDiv.textContent = 'Scenario Complete!';
+        statusDiv.classList.add('won');
+        hudStatus.textContent = 'COMPLETE!';
+        hudStatus.classList.add('won');
+        break;
+      case 'lost':
+        statusDiv.textContent = 'Scenario Failed';
+        statusDiv.classList.add('lost');
+        hudStatus.textContent = 'FAILED';
+        hudStatus.classList.add('lost');
+        break;
+      default:
+        statusDiv.textContent = info.name;
+        hudStatus.textContent = info.name;
+    }
+  }
+
+  // Subscribe to state changes
+  setOnScenarioStateChange(updateScenarioUI);
+
+  // Also update periodically for timer
+  setInterval(() => {
+    const info = getScenarioInfo();
+    if (info && info.status === 'playing') {
+      updateScenarioUI();
+    }
+  }, 100);
 }

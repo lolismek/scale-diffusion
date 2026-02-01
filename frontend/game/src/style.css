@@ -158,3 +158,130 @@ button {
   z-index: 1;
 }
 #aiVideo.active { display: block; }
+
+/* Scenario UI styles */
+#scenarioSelect {
+  width: 100%;
+  padding: 6px 8px;
+  background: #16213e;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scenario-desc {
+  font-size: 11px;
+  color: #888;
+  margin: 6px 0;
+  min-height: 28px;
+  line-height: 1.4;
+}
+
+.btn-scenario {
+  background: #00897b;
+  color: #fff;
+}
+.btn-scenario:hover { background: #00a08a; }
+.btn-scenario.hidden { display: none; }
+
+.scenario-controls {
+  display: none;
+  margin-top: 8px;
+}
+.scenario-controls.visible { display: block; }
+
+.scenario-info {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.scenario-stat {
+  flex: 1;
+  background: #16213e;
+  border-radius: 4px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.scenario-stat .label {
+  display: block;
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scenario-stat .value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.scenario-status {
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  text-align: center;
+  background: #16213e;
+  margin-bottom: 8px;
+}
+
+.scenario-status.playing { background: #1b5e20; color: #a5d6a7; }
+.scenario-status.paused { background: #e65100; color: #ffcc80; }
+.scenario-status.won { background: #1565c0; color: #90caf9; }
+.scenario-status.lost { background: #b71c1c; color: #ef9a9a; }
+
+.scenario-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-small {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11px;
+  background: #2a2a4a;
+  color: #ccc;
+}
+.btn-small:hover { background: #3a3a6a; }
+.btn-small.btn-stop { background: #5d1f1f; }
+.btn-small.btn-stop:hover { background: #7d2f2f; }
+
+/* Scenario HUD overlay */
+.scenario-hud {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  text-align: right;
+  pointer-events: none;
+  z-index: 2;
+}
+.scenario-hud.visible { display: block; }
+
+.hud-timer {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  font-family: 'Courier New', monospace;
+}
+
+.hud-status {
+  font-size: 14px;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  margin-top: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.hud-status.playing { background: rgba(27, 94, 32, 0.8); }
+.hud-status.paused { background: rgba(230, 81, 0, 0.8); }
+.hud-status.won { background: rgba(21, 101, 192, 0.9); font-size: 18px; }
+.hud-status.lost { background: rgba(183, 28, 28, 0.9); font-size: 18px; }
