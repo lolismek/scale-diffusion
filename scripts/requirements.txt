@@ -1,3 +1,0 @@
-commonroad-io>=2024.1
-numpy
-requests
