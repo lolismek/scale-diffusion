@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import Video2Ascii from 'video2ascii'
 import ShapeBlur from './components/ShapeBlur'
 import GameCanvas from './components/GameCanvas'
-import LightPillar from './components/LightPillar'
 import { testUploadApi } from './utils/upload'
 import './App.css'
 
@@ -267,43 +266,9 @@ function App() {
           </div>
         </div>
 
-      {/* Light pillar arrow - appears when connected, behind content */}
-      {isConnected && (
-        <div className={`light-pillar-layer ${hasAnimated ? 'no-anim' : ''} ${isFullscreen ? 'hidden' : ''}`}>
-          <LightPillar
-            topColor="#ffffff"
-            bottomColor="#ffffff"
-            intensity={0.9}
-            rotationSpeed={-2}
-            glowAmount={0.001}
-            pillarWidth={1.2}
-            pillarHeight={0.2}
-            noiseIntensity={0.4}
-            pillarRotation={90}
-            interactive={false}
-            mixBlendMode="screen"
-            quality="medium"
-          />
-        </div>
-      )}
-
       {/* Flowchart layout - appears when connected */}
       {isConnected && (
         <div className={`flowchart-container ${isFullscreen ? 'fullscreen' : ''}`}>
-          {/* Left side box - input video */}
-          <div className={`flowchart-side left-side ${hasAnimated ? 'no-anim' : ''} ${isFullscreen ? 'hidden' : ''}`}>
-            <div className="side-box">
-              <video
-                src="/input.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="side-video left-video"
-              />
-            </div>
-          </div>
-
           {/* Center panel - Game */}
           <div className="flowchart-panel center-panel">
             <div className="game-frame" onClick={() => gameLoaded && setIsFullscreen(!isFullscreen)}>
@@ -328,20 +293,6 @@ function App() {
                 borderSize={0.03}
                 circleSize={0.03}
                 circleEdge={1}
-              />
-            </div>
-          </div>
-
-          {/* Right side box - waymo video */}
-          <div className={`flowchart-side right-side ${hasAnimated ? 'no-anim' : ''} ${isFullscreen ? 'hidden' : ''}`}>
-            <div className="side-box">
-              <video
-                src="/waymo.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="side-video"
               />
             </div>
           </div>
