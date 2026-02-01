@@ -33,6 +33,10 @@ html, body, #root {
   height: 100%;
 }
 
+.background-layers.hidden {
+  display: none;
+}
+
 /* Top and bottom edge fade to black */
 .background-layers::before {
   content: '';
@@ -44,8 +48,8 @@ html, body, #root {
   pointer-events: none;
   z-index: 100;
   background:
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, transparent 18%),
-    linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, transparent 18%);
+    linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, transparent 22%),
+    linear-gradient(to top, rgba(0, 0, 0, 1) 0%, transparent 22%);
 }
 
 .ascii-bg {
@@ -113,6 +117,10 @@ html, body, #root {
   animation: fadeOut 0.4s ease-out forwards;
 }
 
+.terminal-content.fading-out {
+  animation: fadeOut 0.8s ease-out forwards;
+}
+
 @keyframes fadeOut {
   to {
     opacity: 0;
@@ -177,6 +185,24 @@ html, body, #root {
 .info-line:first-child {
   color: #d4824a;
   margin-bottom: 16px;
+}
+
+/* Staggered line animation */
+.stagger-line {
+  opacity: 0;
+  animation: lineReveal 0.3s ease-out forwards;
+  animation-delay: calc(var(--line-index) * 80ms);
+}
+
+@keyframes lineReveal {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .color-palettes {
@@ -254,6 +280,21 @@ html, body, #root {
   margin-top: 4px;
 }
 
+.submit-output {
+  margin-top: 16px;
+}
+
+.submit-line {
+  color: #666;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.submit-line:last-child {
+  color: #d4824a;
+}
+
 
 /* TV container */
 .tv-container {
@@ -267,6 +308,28 @@ html, body, #root {
   align-items: center;
 }
 
+.tv-container.fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.tv-container.fullscreen .game-frame {
+  width: 100vw;
+  height: 100vh;
+  border: none;
+  box-shadow: none;
+  animation: none;
+}
+
+.tv-container.fullscreen .game-frame canvas,
+.tv-container.fullscreen .game-frame video {
+  object-fit: cover;
+}
+
 /* Game frame - 480x480 black square with white outline */
 .game-frame {
   width: 480px;
@@ -275,6 +338,16 @@ html, body, #root {
   border: 1px solid #fff;
   position: relative;
   overflow: hidden;
+  animation: glowFadeIn 1.5s ease-out forwards;
+}
+
+@keyframes glowFadeIn {
+  0% {
+    box-shadow: 0 0 60px rgba(255,255,255,0), 0 0 120px rgba(255,255,255,0);
+  }
+  100% {
+    box-shadow: 0 0 60px rgba(255,255,255,0.2), 0 0 120px rgba(255,255,255,0.1);
+  }
 }
 
 .game-canvas {
@@ -288,6 +361,56 @@ html, body, #root {
   display: block;
 }
 
+.prompt-input, .status-box {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 480px;
+  padding: 10px 12px;
+  background: #000;
+  border: 1px solid #333;
+  color: #888;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  outline: none;
+  z-index: 500;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out 0.3s forwards;
+  box-shadow: 0 0 40px rgba(255,255,255,0.08), 0 0 80px rgba(255,255,255,0.04);
+}
+
+.prompt-input {
+  top: calc(50% + 290px);
+}
+
+.status-box {
+  top: calc(50% - 330px);
+  display: flex;
+  justify-content: space-between;
+}
+
+.status-box .wallet {
+  color: #666;
+}
+
+.status-box .status {
+  color: #555;
+}
+
+.prompt-input.no-anim, .status-box.no-anim {
+  opacity: 1;
+  animation: none;
+}
+
+.prompt-input:focus {
+  border-color: #555;
+  color: #ccc;
+}
+
+.prompt-input::placeholder {
+  color: #444;
+}
+
 /* Glow effect - separate element */
 .game-frame::after {
   content: '';
@@ -297,7 +420,7 @@ html, body, #root {
   width: 100%;
   height: 100%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 60px rgba(255,255,255,0.2);
+  box-shadow: 0 0 80px rgba(255,255,255,0.5);
   animation: glowOut 1.5s ease-out forwards;
   pointer-events: none;
 }
@@ -320,23 +443,23 @@ html, body, #root {
   width: 100%;
   height: 100%;
   transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.08);
-  filter: blur(30px);
-  animation: pushOut 1.4s ease-out forwards;
+  background: rgba(255,255,255,0.9);
+  filter: blur(20px);
+  animation: pushOut 1s ease-out forwards;
   pointer-events: none;
-  z-index: -1;
+  z-index: 200;
 }
 
 @keyframes pushOut {
   0% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
-    filter: blur(20px);
+    filter: blur(10px);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(1.6);
-    filter: blur(50px);
+    transform: translate(-50%, -50%) scale(1.8);
+    filter: blur(40px);
   }
 }
 

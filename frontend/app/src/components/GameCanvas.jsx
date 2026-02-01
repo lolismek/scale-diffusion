@@ -4,7 +4,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
-const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City realistic buildings and streets' }) => {
+const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City realistic buildings and streets', isFullscreen = false, onLoaded = () => {} }) => {
+  const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const rendererRef = useRef(null);
@@ -13,6 +14,7 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
   const connectingRef = useRef(false);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiStatus, setAiStatus] = useState('disconnected');
+  const [loaded, setLoaded] = useState(false);
 
   // Enable AI texture via WebSocket
   const enableAI = async () => {
@@ -31,7 +33,17 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     console.log('Connecting to Decart via WebSocket...');
 
     try {
-      const stream = rendererRef.current.domElement.captureStream(30);
+      const canvas = rendererRef.current.domElement;
+      console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+      const stream = canvas.captureStream(30);
+      const videoTrack = stream.getVideoTracks()[0];
+      console.log('Outgoing stream:', {
+        tracks: stream.getTracks().length,
+        videoTrack: videoTrack?.label,
+        settings: videoTrack?.getSettings()
+      });
+
       const ws = new WebSocket('wss://api3.decart.ai/v1/stream-trial?model=mirage');
       wsRef.current = ws;
 
@@ -51,20 +63,54 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
         };
 
         // Add canvas stream tracks
-        stream.getTracks().forEach(track => {
-          pc.addTrack(track, stream);
-        });
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+          console.log('Adding video track:', videoTrack.readyState, videoTrack.enabled, videoTrack.muted);
+          const sender = pc.addTrack(videoTrack, stream);
+
+          // Log stats periodically to verify frames are being sent
+          const statsInterval = setInterval(async () => {
+            if (pc.connectionState !== 'connected') {
+              clearInterval(statsInterval);
+              return;
+            }
+            const stats = await sender.getStats();
+            stats.forEach(report => {
+              if (report.type === 'outbound-rtp' && report.kind === 'video') {
+                console.log('Outbound video:', {
+                  framesSent: report.framesSent,
+                  bytesSent: report.bytesSent,
+                  framesPerSecond: report.framesPerSecond
+                });
+              }
+            });
+          }, 2000);
+        }
 
         // Handle incoming video stream
         pc.ontrack = (event) => {
           console.log('Received remote track', event.track.kind, event.streams);
           if (videoRef.current && event.streams[0]) {
-            videoRef.current.srcObject = event.streams[0];
-            videoRef.current.play().then(() => {
-              console.log('Video playing, dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
-            }).catch(e => console.log('Video play error:', e));
-            setAiEnabled(true);
-            setAiStatus('connected');
+            const video = videoRef.current;
+            video.srcObject = event.streams[0];
+
+            // Wait for metadata to load before playing
+            video.onloadedmetadata = () => {
+              console.log('Video metadata loaded:', video.videoWidth, 'x', video.videoHeight);
+              video.play().then(() => {
+                console.log('Video playing');
+                setAiEnabled(true);
+                setAiStatus('connected');
+              }).catch(e => console.error('Video play error:', e));
+            };
+
+            // First frame received - reveal the game
+            video.onplaying = () => {
+              console.log('First frame received, revealing game');
+              // Small delay to ensure frame is actually rendered
+              setTimeout(() => setLoaded(true), 100);
+            };
+
             console.log('Video srcObject set, tracks:', event.streams[0].getTracks().map(t => t.kind));
           }
         };
@@ -72,7 +118,14 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
         // Handle ICE candidates
         pc.onicecandidate = (event) => {
           if (event.candidate) {
-            ws.send(JSON.stringify({ type: 'ice', candidate: event.candidate }));
+            ws.send(JSON.stringify({
+              type: 'ice-candidate',
+              candidate: {
+                candidate: event.candidate.candidate,
+                sdpMid: event.candidate.sdpMid,
+                sdpMLineIndex: event.candidate.sdpMLineIndex
+              }
+            }));
           }
         };
 
@@ -84,12 +137,17 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
 
       ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
-        console.log('WS message:', data.type);
+        console.log('WS message:', data.type, data);
 
         if (data.type === 'answer' && pcRef.current) {
           await pcRef.current.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
-        } else if (data.type === 'ice' && pcRef.current) {
+          // Send initial prompt after connection is established
+          ws.send(JSON.stringify({ type: 'prompt', prompt, enhance_prompt: true }));
+          console.log('Sent initial prompt:', prompt);
+        } else if (data.type === 'ice-candidate' && pcRef.current && data.candidate) {
           await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } else if (data.type === 'error') {
+          console.error('Decart error:', data.message || data);
         }
       };
 
@@ -131,6 +189,14 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     setAiStatus('disconnected');
   };
 
+  // Auto-focus wrapper when loaded to enable WASD
+  useEffect(() => {
+    if (loaded) {
+      wrapperRef.current?.focus();
+      onLoaded();
+    }
+  }, [loaded, onLoaded]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -142,7 +208,7 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
   useEffect(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       console.log('Sending prompt update:', prompt);
-      wsRef.current.send(JSON.stringify({ type: 'prompt', text: prompt }));
+      wsRef.current.send(JSON.stringify({ type: 'prompt', prompt, enhance_prompt: true }));
     }
   }, [prompt]);
 
@@ -164,30 +230,36 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     scene.background = new THREE.Color('#87CEEB');
     scene.fog = new THREE.Fog('#87CEEB', 100, 1500);
 
-    // Camera
+    // Camera - 16:9 aspect for Decart
     const camera = new THREE.PerspectiveCamera(
       75,
-      container.clientWidth / container.clientHeight,
+      1280 / 720,
       0.1,
       5000
     );
     camera.position.set(0, 5, 50);
 
-    // Renderer
+    // Renderer - force 1280x720 for Decart compatibility
+    const DECART_WIDTH = 1280;
+    const DECART_HEIGHT = 720;
     const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(DECART_WIDTH, DECART_HEIGHT);
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.objectFit = 'cover';
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Trigger AI enable after renderer is ready
+    // Trigger AI enable after city loads and a few frames render
+    // Delay longer to ensure canvas has real content
     setTimeout(() => {
       if (!wsRef.current) {
         console.log('Renderer ready, enabling Decart AI...');
         enableAI();
       }
-    }, 1000);
+    }, 3000);
 
     // Lighting
     scene.add(new THREE.HemisphereLight(0xc8d8e8, 0x7a6e5a, 0.9));
@@ -202,7 +274,7 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      new THREE.Vector2(DECART_WIDTH, DECART_HEIGHT),
       0.3, 0.4, 0.85
     );
     composer.addPass(bloomPass);
@@ -280,10 +352,8 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     document.addEventListener('keyup', onKeyUp);
     renderer.domElement.addEventListener('click', onClick);
 
-    // Movement update
+    // Movement update - WASD works anywhere, mouse look needs pointer lock
     const updateMovement = () => {
-      if (document.pointerLockElement !== renderer.domElement) return;
-
       if (state.keys['w']) state.carSpeed += accel;
       if (state.keys['s']) state.carSpeed -= brakeForce;
       state.carSpeed -= friction;
@@ -311,12 +381,9 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     };
     animate();
 
-    // Resize handler
+    // Resize handler - keep canvas at 1280x720 for Decart, CSS handles display scaling
     const onResize = () => {
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      composer.setSize(container.clientWidth, container.clientHeight);
+      // Fixed resolution for Decart - no resize needed
     };
     window.addEventListener('resize', onResize);
 
@@ -335,8 +402,17 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
   }, []);
 
   return (
-    <div className={className} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+    <div
+      ref={wrapperRef}
+      tabIndex={0}
+      className={className}
+      style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', outline: 'none' }}
+      onClick={() => wrapperRef.current?.focus()}
+    >
+      {/* Three.js canvas (renders but hidden until AI ready) */}
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* AI-processed video overlay */}
       <video
         ref={videoRef}
         autoPlay
@@ -350,11 +426,51 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
           height: '100%',
           objectFit: 'cover',
           pointerEvents: 'none',
-          zIndex: 100,
-          opacity: aiEnabled ? 1 : 0,
+          zIndex: aiEnabled ? 100 : -1,
           background: '#000',
         }}
       />
+
+      {/* Loading overlay - black with spinner until first frame */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: '#000',
+          zIndex: 200,
+          opacity: loaded ? 0 : 1,
+          transition: 'opacity 0.8s ease-out',
+          pointerEvents: loaded ? 'none' : 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {!loaded && (
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              border: '3px solid rgba(255,255,255,0.1)',
+              borderTopColor: '#fff',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite, fadeIn 0.5s ease-out',
+            }}
+          />
+        )}
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+        `}</style>
+      </div>
     </div>
   );
 };
