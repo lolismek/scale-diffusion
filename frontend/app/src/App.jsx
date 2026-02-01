@@ -37,7 +37,13 @@ const INFO_LINES = [
   { label: '', value: 'awaiting wallet' },
 ]
 
+// Detect mobile devices
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
+}
+
 function App() {
+  const [isMobile, setIsMobile] = useState(false)
   const [walletAddress, setWalletAddress] = useState('')
   const [inputValue, setInputValue] = useState('')
   const [error, setError] = useState('')
@@ -57,6 +63,11 @@ function App() {
   const [timeRemaining, setTimeRemaining] = useState(null) // seconds remaining
   const inputRef = useRef(null)
   const gameCanvasRef = useRef(null)
+
+  // Check for mobile on mount
+  useEffect(() => {
+    setIsMobile(isMobileDevice())
+  }, [])
 
   // Format seconds as M:SS
   const formatTime = (secs) => {
@@ -181,6 +192,13 @@ function App() {
 
   return (
     <div className="container">
+      {/* Mobile overlay */}
+      {isMobile && (
+        <div className="mobile-overlay">
+          <div className="mobile-message">please use desktop</div>
+        </div>
+      )}
+
       {/* Background layers - always visible, terminal covers it */}
       <div className={`background-layers ${isFullscreen ? 'hidden' : ''}`}>
         <div className="fluid-overlay">
@@ -208,6 +226,7 @@ function App() {
       </div>
 
       {/* Terminal - morphs into TV, stays rendered to prevent flicker */}
+      {!isMobile && (
       <div className={`terminal ${isTransitioning ? 'morphing' : ''} ${isConnected ? 'hidden' : ''}`}>
           <div className={`terminal-content ${isFadingOut ? 'fading-out' : ''}`}>
             {showFastfetch && (
@@ -265,9 +284,10 @@ function App() {
             )}
           </div>
         </div>
+      )}
 
       {/* Flowchart layout - appears when connected */}
-      {isConnected && (
+      {!isMobile && isConnected && (
         <div className={`flowchart-container ${isFullscreen ? 'fullscreen' : ''}`}>
           {/* Center panel - Game */}
           <div className="flowchart-panel center-panel">
@@ -299,7 +319,7 @@ function App() {
         </div>
       )}
 
-      {isConnected && (
+      {!isMobile && isConnected && (
         <>
           <div className={`status-box ${hasAnimated ? 'no-anim' : ''} ${isFullscreen ? 'hidden' : ''}`}>
             <span className="wallet-group">
