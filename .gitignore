@@ -222,3 +222,4 @@ outputs_video/
 outputs/
 wan_models/
 .DS_Store
+sessions/

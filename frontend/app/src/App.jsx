@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Video2Ascii from 'video2ascii'
 import ShapeBlur from './components/ShapeBlur'
 import GameCanvas from './components/GameCanvas'
+import { testUploadApi } from './utils/upload'
 import './App.css'
 
 // Validate Solana address format (base58, 32-44 chars)
@@ -51,7 +52,23 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hasAnimated, setHasAnimated] = useState(false)
   const [gameLoaded, setGameLoaded] = useState(false)
+  const [gameStatus, setGameStatus] = useState('connecting') // 'connecting' | 'collecting' | 'disconnected'
+  const [timeRemaining, setTimeRemaining] = useState(null) // seconds remaining
   const inputRef = useRef(null)
+  const gameCanvasRef = useRef(null)
+
+  // Format seconds as M:SS
+  const formatTime = (secs) => {
+    if (secs === null) return ''
+    const m = Math.floor(secs / 60)
+    const s = secs % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  // Test upload API on mount
+  useEffect(() => {
+    testUploadApi()
+  }, [])
 
   // Show fastfetch then input (after fastfetch finishes loading)
   useEffect(() => {
@@ -253,11 +270,15 @@ function App() {
         <div className={`tv-container ${isFullscreen ? 'fullscreen' : ''}`}>
           <div className="game-frame" onClick={() => gameLoaded && setIsFullscreen(!isFullscreen)}>
             <GameCanvas
+              ref={gameCanvasRef}
               className="game-canvas"
               apiKey={import.meta.env.VITE_DECART_API_KEY}
               prompt={aiPrompt}
               isFullscreen={isFullscreen}
               onLoaded={() => setGameLoaded(true)}
+              onStatusChange={setGameStatus}
+              onTimerUpdate={setTimeRemaining}
+              walletAddress={walletAddress}
             />
           </div>
           {!isFullscreen && (
@@ -279,8 +300,37 @@ function App() {
       {isConnected && !isFullscreen && (
         <>
           <div className={`status-box ${hasAnimated ? 'no-anim' : ''}`}>
-            <span className="wallet">{truncateAddress(walletAddress)}</span>
-            <span className="status">connected</span>
+            <span className="wallet-group">
+              <span className="wallet-label">wallet:</span> <span className="wallet-address">{truncateAddress(walletAddress)}</span>
+            </span>
+            <span
+              className={`status ${gameStatus}`}
+              onClick={() => {
+                if (gameStatus === 'collecting') gameCanvasRef.current?.stopEarly()
+                if (gameStatus === 'connected') gameCanvasRef.current?.startNewSession()
+                if (gameStatus === 'disconnected') gameCanvasRef.current?.reconnect()
+              }}
+            >
+              {gameStatus === 'collecting' && timeRemaining !== null ? (
+                <>
+                  <span className="status-label">collecting</span>
+                  <span className="status-stop">stop early</span>
+                  <span className="status-timer"> ({formatTime(timeRemaining)})</span>
+                </>
+              ) : gameStatus === 'connected' ? (
+                <>
+                  <span className="status-label">connected</span>
+                  <span className="status-stop">record (1:00)</span>
+                </>
+              ) : gameStatus === 'uploading' ? 'uploading...'
+              : gameStatus === 'thankyou' ? 'thank you!'
+              : gameStatus === 'disconnected' ? (
+                <>
+                  <span className="status-label">disconnected</span>
+                  <span className="status-stop">attempt reconnect</span>
+                </>
+              ) : gameStatus}
+            </span>
           </div>
           <input
             type="text"

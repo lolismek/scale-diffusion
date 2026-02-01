@@ -1,0 +1,19 @@
+{
+  "name": "scale-diffusion-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "sst dev",
+    "deploy": "sst deploy",
+    "remove": "sst remove"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "@aws-sdk/client-sqs": "^3.600.0"
+  },
+  "devDependencies": {
+    "sst": "^3.0.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,10 +1,14 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { Spinner } from './Spinner';
+import { uploadSession } from '../utils/upload';
 
-const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City realistic buildings and streets', isFullscreen = false, onLoaded = () => {} }) => {
+const SESSION_DURATION_MS = 60 * 1000; // 1 minute
+
+const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'New York City realistic buildings and streets', isFullscreen = false, onLoaded = () => {}, onStatusChange = () => {}, onTimerUpdate = () => {}, walletAddress = '' }, ref) => {
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const videoRef = useRef(null);
@@ -15,6 +19,28 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiStatus, setAiStatus] = useState('disconnected');
   const [loaded, setLoaded] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+
+  // Simple logging refs
+  const sessionLogRef = useRef([]);
+  const cameraRef = useRef(null);
+
+  // Recording refs
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const sessionIdRef = useRef(`session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const sessionTimerRef = useRef(null);
+  const sessionStartTimeRef = useRef(null);
+  const sessionEndedRef = useRef(false);
+  const timerIntervalRef = useRef(null);
+
+  // Latency tracking
+  const latencyRef = useRef({
+    samples: [],           // Array of {t, rtt} measurements
+    streamStartTime: null, // When we started sending frames
+    firstFrameTime: null,  // When we received first AI frame
+    initialLatency: null,  // firstFrameTime - streamStartTime
+  });
 
   // Enable AI texture via WebSocket
   const enableAI = async () => {
@@ -57,6 +83,11 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
 
         pc.onconnectionstatechange = () => {
           console.log('PC connection state:', pc.connectionState);
+          // Mark when we start sending frames
+          if (pc.connectionState === 'connected' && !latencyRef.current.streamStartTime) {
+            latencyRef.current.streamStartTime = performance.now();
+            console.log('Stream started at:', latencyRef.current.streamStartTime);
+          }
         };
         pc.oniceconnectionstatechange = () => {
           console.log('ICE connection state:', pc.iceConnectionState);
@@ -68,13 +99,13 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
           console.log('Adding video track:', videoTrack.readyState, videoTrack.enabled, videoTrack.muted);
           const sender = pc.addTrack(videoTrack, stream);
 
-          // Log stats periodically to verify frames are being sent
+          // Log stats and measure RTT periodically
           const statsInterval = setInterval(async () => {
             if (pc.connectionState !== 'connected') {
               clearInterval(statsInterval);
               return;
             }
-            const stats = await sender.getStats();
+            const stats = await pc.getStats();
             stats.forEach(report => {
               if (report.type === 'outbound-rtp' && report.kind === 'video') {
                 console.log('Outbound video:', {
@@ -82,6 +113,17 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
                   bytesSent: report.bytesSent,
                   framesPerSecond: report.framesPerSecond
                 });
+              }
+              // Capture RTT from candidate-pair stats
+              if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                const rtt = report.currentRoundTripTime * 1000; // Convert to ms
+                if (rtt > 0) {
+                  latencyRef.current.samples.push({
+                    t: performance.now(),
+                    rtt: rtt,
+                  });
+                  console.log('RTT sample:', rtt.toFixed(1), 'ms');
+                }
               }
             });
           }, 2000);
@@ -104,10 +146,15 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
               }).catch(e => console.error('Video play error:', e));
             };
 
-            // First frame received - reveal the game
+            // First frame received - reveal the game and measure initial latency
             video.onplaying = () => {
+              const now = performance.now();
+              if (latencyRef.current.streamStartTime && !latencyRef.current.firstFrameTime) {
+                latencyRef.current.firstFrameTime = now;
+                latencyRef.current.initialLatency = now - latencyRef.current.streamStartTime;
+                console.log('First AI frame received! Initial latency:', latencyRef.current.initialLatency.toFixed(0), 'ms');
+              }
               console.log('First frame received, revealing game');
-              // Small delay to ensure frame is actually rendered
               setTimeout(() => setLoaded(true), 100);
             };
 
@@ -163,6 +210,11 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
         setAiEnabled(false);
         setAiStatus('disconnected');
         connectingRef.current = false;
+        // If session was active and not ended, upload what we have
+        if (sessionStartTimeRef.current && !sessionEndedRef.current) {
+          console.log('WebSocket disconnected early - uploading collected data');
+          endSession();
+        }
       };
 
     } catch (err) {
@@ -189,7 +241,199 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     setAiStatus('disconnected');
   };
 
-  // Auto-focus wrapper when loaded to enable WASD
+  // Simple logging - just push to array
+  const logEvent = (type, data) => {
+    sessionLogRef.current.push({
+      t: performance.now(),
+      type,
+      ...data,
+    });
+  };
+
+  // Start recording the AI video stream
+  const startRecording = () => {
+    const video = videoRef.current;
+    if (!video || !video.srcObject) {
+      console.log('No video stream to record');
+      return;
+    }
+
+    try {
+      const stream = video.srcObject;
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp8',
+        videoBitsPerSecond: 2500000,
+      });
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        console.log('MediaRecorder stopped, chunks:', recordedChunksRef.current.length);
+      };
+
+      mediaRecorder.start(1000); // Collect data every second
+      mediaRecorderRef.current = mediaRecorder;
+      sessionStartTimeRef.current = Date.now();
+      onStatusChange('collecting');
+      console.log('Recording started');
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+    }
+  };
+
+  // End session: stop recording, bundle data, upload
+  const endSession = async () => {
+    if (sessionEndedRef.current) return;
+    sessionEndedRef.current = true;
+    setSessionEnded(true);
+    console.log('Ending session...');
+
+    // Stop the timer if still running
+    if (sessionTimerRef.current) {
+      clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+
+    // Stop recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      // Wait a bit for final chunks
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // Create video blob
+    const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+    console.log('Video blob size:', videoBlob.size);
+
+    // Separate camera events from input events
+    const allEvents = sessionLogRef.current;
+    const inputEvents = allEvents.filter(e => e.type !== 'camera');
+    const cameraEvents = allEvents.filter(e => e.type === 'camera');
+
+    // Calculate average RTT from samples
+    const rttSamples = latencyRef.current.samples;
+    const avgRtt = rttSamples.length > 0
+      ? rttSamples.reduce((sum, s) => sum + s.rtt, 0) / rttSamples.length
+      : null;
+
+    // Bundle and upload
+    const bundle = {
+      sessionId: sessionIdRef.current,
+      walletAddress,
+      prompt,
+      video: videoBlob,
+      inputs: inputEvents,
+      camera: cameraEvents,
+      latency: {
+        initialLatency: latencyRef.current.initialLatency,  // Time from stream start to first AI frame
+        avgRtt: avgRtt,                                      // Average round-trip time during session
+        rttSamples: rttSamples,                              // All RTT measurements with timestamps
+      },
+      metadata: {
+        duration: Date.now() - (sessionStartTimeRef.current || Date.now()),
+        eventCount: allEvents.length,
+        startTime: sessionStartTimeRef.current,
+        endTime: Date.now(),
+      },
+    };
+
+    console.log('Latency data:', {
+      initialLatency: latencyRef.current.initialLatency?.toFixed(0) + 'ms',
+      avgRtt: avgRtt?.toFixed(1) + 'ms',
+      sampleCount: rttSamples.length,
+    });
+
+    console.log('Uploading session bundle...', {
+      sessionId: bundle.sessionId,
+      videoSize: videoBlob.size,
+      inputCount: inputEvents.length,
+      cameraCount: cameraEvents.length,
+    });
+
+    // Clear timer display
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    onTimerUpdate(null);
+
+    // Show uploading
+    onStatusChange('uploading');
+
+    // Upload
+    const result = await uploadSession(bundle);
+    if (result.success) {
+      console.log('Session uploaded successfully!', result.keys);
+    } else {
+      console.error('Session upload failed:', result.error);
+    }
+
+    // Show thank you, then connected
+    onStatusChange('thankyou');
+    setTimeout(() => {
+      onStatusChange('connected');
+    }, 1500);
+  };
+
+  // Start a new recording session
+  const startNewSession = () => {
+    // Reset session state
+    sessionEndedRef.current = false;
+    setSessionEnded(false);
+    sessionIdRef.current = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    sessionLogRef.current = [];
+    recordedChunksRef.current = [];
+    // Reset latency tracking (keep initial values, just clear samples)
+    latencyRef.current.samples = [];
+
+    console.log('Starting new session:', sessionIdRef.current);
+    startRecording();
+
+    const endTime = Date.now() + SESSION_DURATION_MS;
+
+    // Update countdown every 100ms
+    timerIntervalRef.current = setInterval(() => {
+      const remaining = Math.max(0, endTime - Date.now());
+      const secs = Math.ceil(remaining / 1000);
+      onTimerUpdate(secs);
+      if (remaining <= 0) {
+        clearInterval(timerIntervalRef.current);
+      }
+    }, 100);
+
+    sessionTimerRef.current = setTimeout(() => {
+      console.log('Session timer complete (1 min) - ending session');
+      clearInterval(timerIntervalRef.current);
+      onTimerUpdate(0);
+      endSession();
+    }, SESSION_DURATION_MS);
+  };
+
+  // Attempt to reconnect to Decart
+  const reconnect = () => {
+    console.log('Attempting to reconnect...');
+    disableAI();
+    setTimeout(() => {
+      enableAI();
+    }, 500);
+  };
+
+  // Expose stopEarly, startNewSession, and reconnect to parent
+  useImperativeHandle(ref, () => ({
+    stopEarly: () => {
+      if (!sessionEndedRef.current && sessionStartTimeRef.current) {
+        console.log('Stopping session early...');
+        endSession();
+      }
+    },
+    startNewSession,
+    reconnect
+  }));
+
+  // Auto-focus wrapper when loaded
   useEffect(() => {
     if (loaded) {
       wrapperRef.current?.focus();
@@ -197,12 +441,66 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
     }
   }, [loaded, onLoaded]);
 
+  // Start recording and 1-min timer when loaded
+  useEffect(() => {
+    if (loaded && !sessionEnded) {
+      console.log('Game loaded - starting recording and 1-min session timer');
+      startRecording();
+
+      const endTime = Date.now() + SESSION_DURATION_MS;
+
+      // Update countdown every second
+      timerIntervalRef.current = setInterval(() => {
+        const remaining = Math.max(0, endTime - Date.now());
+        const secs = Math.ceil(remaining / 1000);
+        onTimerUpdate(secs);
+        if (remaining <= 0) {
+          clearInterval(timerIntervalRef.current);
+        }
+      }, 100);
+
+      sessionTimerRef.current = setTimeout(() => {
+        console.log('Session timer complete (1 min) - ending session');
+        clearInterval(timerIntervalRef.current);
+        onTimerUpdate(0);
+        endSession();
+      }, SESSION_DURATION_MS);
+    }
+
+    return () => {
+      if (sessionTimerRef.current) {
+        clearTimeout(sessionTimerRef.current);
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [loaded]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (sessionTimerRef.current) {
+        clearTimeout(sessionTimerRef.current);
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       disableAI();
     };
   }, []);
+
+  // Notify parent of status changes
+  useEffect(() => {
+    // Status: 'connecting' | 'connected' | 'disconnected'
+    let status = 'disconnected';
+    if (aiStatus === 'connecting') status = 'connecting';
+    else if (aiEnabled) status = 'connected';
+    onStatusChange(status);
+  }, [aiStatus, aiEnabled, onStatusChange]);
 
   // Update prompt when it changes
   useEffect(() => {
@@ -333,14 +631,22 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
       state.yaw -= e.movementX * 0.002;
       euler.set(0, state.yaw, 0);
       camera.quaternion.setFromEuler(euler);
+      // Log mouse movement
+      logEvent('mouse', { dx: e.movementX, dy: e.movementY });
     };
 
     const onKeyDown = (e) => {
       if (e.target.tagName === 'INPUT') return;
-      state.keys[e.key.toLowerCase()] = true;
+      const key = e.key.toLowerCase();
+      if (!state.keys[key]) {
+        state.keys[key] = true;
+        logEvent('keydown', { key });
+      }
     };
     const onKeyUp = (e) => {
-      state.keys[e.key.toLowerCase()] = false;
+      const key = e.key.toLowerCase();
+      state.keys[key] = false;
+      logEvent('keyup', { key });
     };
 
     const onClick = () => {
@@ -372,12 +678,29 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
       camera.position.add(direction.multiplyScalar(state.carSpeed));
     };
 
+    // Store camera reference for logging
+    cameraRef.current = camera;
+
+    // Store camera ref for external access
+    cameraRef.current = camera;
+
     // Animation loop
     let animationId;
+    let frameCount = 0;
     const animate = () => {
       animationId = requestAnimationFrame(animate);
       updateMovement();
       composer.render();
+
+      // Log camera state every 10th frame (~6fps logging)
+      frameCount++;
+      if (frameCount % 10 === 0) {
+        logEvent('camera', {
+          pos: [camera.position.x, camera.position.y, camera.position.z],
+          yaw: state.yaw,
+          speed: state.carSpeed,
+        });
+      }
     };
     animate();
 
@@ -450,29 +773,12 @@ const GameCanvas = ({ className = '', apiKey = '', prompt = 'New York City reali
         }}
       >
         {!loaded && (
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: '3px solid rgba(255,255,255,0.1)',
-              borderTopColor: '#fff',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite, fadeIn 0.5s ease-out',
-            }}
-          />
+          <Spinner style={{ width: 32, height: 32, color: '#fff', opacity: 0, animation: 'fadeIn 1s ease-out forwards' }} />
         )}
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}</style>
       </div>
+
     </div>
   );
-};
+});
 
 export default GameCanvas;
