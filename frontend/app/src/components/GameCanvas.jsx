@@ -15,11 +15,15 @@ import {
 } from '../game/scenarios';
 
 const SESSION_DURATION_MS = 60 * 1000; // 1 minute
+const DECART_TIMEOUT_MS = 3000; // 3 second timeout for Decart connection
+const LOCAL_DIFFUSION_URL = 'ws://localhost:7860/ws'; // Local StreamDiffusion server
+const LOCAL_DIFFUSION_FRAME_INTERVAL = 33; // ~30fps
 
 const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york city realistic buildings and streets', isFullscreen = false, onLoaded = () => {}, onStatusChange = () => {}, onTimerUpdate = () => {}, onScenarioChange = () => {}, walletAddress = '' }, ref) => {
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const videoRef = useRef(null);
+  const canvasOutputRef = useRef(null); // Canvas for displaying local diffusion output
   const rendererRef = useRef(null);
   const wsRef = useRef(null);
   const pcRef = useRef(null);
@@ -29,6 +33,12 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
   const [loaded, setLoaded] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [debugMode, setDebugMode] = useState(false); // Press 'p' to toggle
+  const [usingLocalDiffusion, setUsingLocalDiffusion] = useState(false); // Track which backend is active
+  
+  // Local diffusion refs
+  const localWsRef = useRef(null);
+  const localFrameIntervalRef = useRef(null);
+  const connectionTimeoutRef = useRef(null);
 
   // Scenario state
   const [activeScenario, setActiveScenario] = useState(null);
@@ -83,6 +93,16 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
     setAiStatus('connecting');
     console.log('[Decart] ========================================');
     console.log('[Decart] Connecting to Decart AI...');
+    
+    // Set up 3-second timeout to fallback to local StreamDiffusion
+    connectionTimeoutRef.current = setTimeout(() => {
+      if (aiStatus === 'connecting' && !aiEnabled) {
+        console.log('[Fallback] Decart connection timeout after 3 seconds');
+        console.log('[Fallback] Switching to local StreamDiffusion...');
+        disableAI();
+        enableLocalDiffusion();
+      }
+    }, DECART_TIMEOUT_MS);
 
     try {
       const canvas = rendererRef.current.domElement;
@@ -151,8 +171,14 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
               console.log('[Decart] Video metadata:', video.videoWidth, 'x', video.videoHeight);
               video.play().then(() => {
                 console.log('[Decart] Video playing');
+                // Clear the fallback timeout - Decart connected successfully
+                if (connectionTimeoutRef.current) {
+                  clearTimeout(connectionTimeoutRef.current);
+                  connectionTimeoutRef.current = null;
+                }
                 setAiEnabled(true);
                 setAiStatus('connected');
+                setUsingLocalDiffusion(false);
               }).catch(e => console.error('[Decart] Video play error:', e));
             };
 
@@ -227,11 +253,133 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
   };
 
   const disableAI = () => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
     if (videoRef.current) { videoRef.current.srcObject = null; }
     setAiEnabled(false);
     setAiStatus('disconnected');
+  };
+  
+  // Disable local diffusion
+  const disableLocalDiffusion = () => {
+    if (localFrameIntervalRef.current) {
+      clearInterval(localFrameIntervalRef.current);
+      localFrameIntervalRef.current = null;
+    }
+    if (localWsRef.current) {
+      localWsRef.current.close();
+      localWsRef.current = null;
+    }
+    setUsingLocalDiffusion(false);
+  };
+
+  // Enable local StreamDiffusion fallback
+  const enableLocalDiffusion = async () => {
+    if (localWsRef.current) return;
+    if (!rendererRef.current) return;
+    
+    console.log('[LocalDiffusion] ========================================');
+    console.log('[LocalDiffusion] Connecting to local StreamDiffusion...');
+    setAiStatus('connecting');
+    connectingRef.current = true;
+    
+    try {
+      const ws = new WebSocket(LOCAL_DIFFUSION_URL);
+      localWsRef.current = ws;
+      
+      ws.binaryType = 'arraybuffer';
+      
+      ws.onopen = () => {
+        console.log('[LocalDiffusion] WebSocket connected');
+        
+        // Send initial prompt
+        ws.send(JSON.stringify({ type: 'prompt', prompt }));
+        
+        // Start sending frames
+        const canvas = rendererRef.current.domElement;
+        const outputCanvas = canvasOutputRef.current;
+        
+        if (outputCanvas) {
+          outputCanvas.width = canvas.width;
+          outputCanvas.height = canvas.height;
+        }
+        
+        localFrameIntervalRef.current = setInterval(() => {
+          if (ws.readyState !== WebSocket.OPEN) return;
+          
+          // Capture canvas as JPEG blob and send
+          canvas.toBlob((blob) => {
+            if (blob && ws.readyState === WebSocket.OPEN) {
+              blob.arrayBuffer().then(buffer => {
+                ws.send(buffer);
+              });
+            }
+          }, 'image/jpeg', 0.8);
+        }, LOCAL_DIFFUSION_FRAME_INTERVAL);
+        
+        setAiEnabled(true);
+        setAiStatus('connected');
+        setUsingLocalDiffusion(true);
+        connectingRef.current = false;
+        
+        // Mark as loaded since local diffusion is now active
+        setTimeout(() => setLoaded(true), 100);
+      };
+      
+      ws.onmessage = (event) => {
+        // Handle binary frame response
+        if (event.data instanceof ArrayBuffer) {
+          const blob = new Blob([event.data], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            const outputCanvas = canvasOutputRef.current;
+            if (outputCanvas) {
+              const ctx = outputCanvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, outputCanvas.width, outputCanvas.height);
+            }
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        } else {
+          // Handle JSON messages
+          try {
+            const data = JSON.parse(event.data);
+            console.log('[LocalDiffusion] Message:', data.type || 'unknown');
+            if (data.type === 'ready') {
+              console.log('[LocalDiffusion] Server ready, model:', data.model);
+            } else if (data.type === 'error') {
+              console.error('[LocalDiffusion] Error:', data.message);
+            }
+          } catch (e) {
+            // Not JSON, might be other data
+          }
+        }
+      };
+      
+      ws.onerror = (e) => {
+        console.error('[LocalDiffusion] WebSocket error:', e);
+        setAiStatus('error');
+        connectingRef.current = false;
+      };
+      
+      ws.onclose = (e) => {
+        console.log('[LocalDiffusion] WebSocket closed, code:', e.code);
+        disableLocalDiffusion();
+        setAiEnabled(false);
+        setAiStatus('disconnected');
+        connectingRef.current = false;
+      };
+      
+    } catch (err) {
+      console.error('[LocalDiffusion] Connection failed:', err);
+      setAiStatus('error');
+      connectingRef.current = false;
+    }
   };
 
   const logEvent = (type, data) => {
@@ -370,6 +518,7 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
 
   const reconnect = () => {
     disableAI();
+    disableLocalDiffusion();
     setTimeout(() => enableAI(), 500);
   };
 
@@ -421,10 +570,12 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
     return () => {
       if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
       disableAI();
+      disableLocalDiffusion();
     };
   }, []);
 
@@ -436,8 +587,13 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
   }, [aiStatus, aiEnabled, onStatusChange]);
 
   useEffect(() => {
+    // Update prompt on Decart connection
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'prompt', prompt, enhance_prompt: true }));
+    }
+    // Update prompt on local diffusion connection
+    if (localWsRef.current && localWsRef.current.readyState === WebSocket.OPEN) {
+      localWsRef.current.send(JSON.stringify({ type: 'prompt', prompt }));
     }
   }, [prompt]);
 
@@ -763,7 +919,23 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
           height: '100%',
           objectFit: 'cover',
           pointerEvents: 'none',
-          zIndex: (aiEnabled && !debugMode) ? 100 : -1,
+          zIndex: (aiEnabled && !debugMode && !usingLocalDiffusion) ? 100 : -1,
+          background: '#000',
+        }}
+      />
+      
+      {/* Canvas for local StreamDiffusion output */}
+      <canvas
+        ref={canvasOutputRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          pointerEvents: 'none',
+          zIndex: (aiEnabled && !debugMode && usingLocalDiffusion) ? 100 : -1,
           background: '#000',
         }}
       />
@@ -774,6 +946,7 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
           <div style={{ marginBottom: 4, color: '#888' }}>Debug Mode (P to hide)</div>
           <div>AI: {aiEnabled ? 'enabled' : 'disabled'}</div>
           <div>Status: {aiStatus}</div>
+          <div>Backend: {usingLocalDiffusion ? 'Local StreamDiffusion' : 'Decart'}</div>
           <div style={{ marginTop: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
             <div>Scenario: {activeScenario?.name || 'none'}</div>
             <div>Result: <span style={{ color: scenarioStatus === 'won' ? '#4caf50' : scenarioStatus === 'lost' ? '#f44336' : '#fff' }}>{scenarioStatus}</span></div>
