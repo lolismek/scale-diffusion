@@ -8,6 +8,7 @@ const container = document.getElementById('canvasContainer')!;
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(state.mapSettings.skyColor);
+scene.fog = new THREE.Fog(state.mapSettings.skyColor, 40, 800);
 
 export const camera = new THREE.PerspectiveCamera(
   75,

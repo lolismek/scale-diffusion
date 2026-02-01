@@ -25,6 +25,9 @@ export function loadScene(data: SceneData): void {
     (document.getElementById('mapColor') as HTMLInputElement).value = state.mapSettings.color;
     (document.getElementById('skyColor') as HTMLInputElement).value = state.mapSettings.skyColor;
     scene.background = new THREE.Color(state.mapSettings.skyColor);
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.color.set(state.mapSettings.skyColor);
+    }
     createGround();
   }
 
