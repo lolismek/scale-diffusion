@@ -1,9 +1,18 @@
-import { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
+import { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { Spinner } from './Spinner';
 import { uploadSession } from '../utils/upload';
+import {
+  initScenarioEngine,
+  startScenario,
+  updateScenario,
+  scenarioState,
+  sampleScenarios,
+  getScenarioById,
+  setOnScenarioStateChange,
+} from '../game/scenarios';
 
 const SESSION_DURATION_MS = 60 * 1000; // 1 minute
 
@@ -20,6 +29,12 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
   const [loaded, setLoaded] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [debugMode, setDebugMode] = useState(false); // Press 'p' to toggle
+
+  // Scenario state
+  const [activeScenario, setActiveScenario] = useState(null);
+  const [scenarioStatus, setScenarioStatus] = useState('idle'); // idle|playing|won|lost
+  const scenarioEngineInitRef = useRef(false);
+  const gameStateRef = useRef({ yaw: 0, carSpeed: 0 });
 
   // Logging refs
   const sessionLogRef = useRef([]);
@@ -41,6 +56,22 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
     firstFrameTime: null,
     initialLatency: null,
   });
+
+  // Scenario helpers
+  const handleStartScenario = useCallback((scenarioId) => {
+    const scenario = getScenarioById(scenarioId);
+    if (scenario) {
+      startScenario(scenario);
+      setActiveScenario(scenario);
+      setScenarioStatus('playing');
+    }
+  }, []);
+
+  const handleStartRandomScenario = useCallback(() => {
+    const randomScenario = sampleScenarios[Math.floor(Math.random() * sampleScenarios.length)];
+    handleStartScenario(randomScenario.id);
+  }, [handleStartScenario]);
+
 
   // Enable AI texture via WebSocket
   const enableAI = async () => {
@@ -279,7 +310,12 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
         avgRtt,
         rttSamples,
       },
-      scenario: null,
+      scenario: scenarioState.activeScenario ? {
+        id: scenarioState.activeScenario.id,
+        name: scenarioState.activeScenario.name,
+        result: scenarioState.hasWon ? 'won' : scenarioState.hasLost ? 'lost' : 'incomplete',
+        collisionCount: scenarioState.collisionCount || 0,
+      } : null,
       metadata: {
         duration: Date.now() - (sessionStartTimeRef.current || Date.now()),
         eventCount: allEvents.length,
@@ -348,8 +384,13 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
     if (loaded) {
       wrapperRef.current?.focus();
       onLoaded();
+      // Auto-start a random scenario when game loads
+      if (scenarioEngineInitRef.current && !activeScenario) {
+        setTimeout(handleStartRandomScenario, 500);
+      }
     }
-  }, [loaded, onLoaded]);
+  }, [loaded, onLoaded, activeScenario, handleStartRandomScenario]);
+
 
   useEffect(() => {
     if (loaded && !sessionEnded) {
@@ -453,7 +494,27 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
     grid.position.y = 0.01;
     scene.add(grid);
 
-    // Load city.json buildings (simple)
+    // Initialize scenario engine with scene/camera references
+    initScenarioEngine(scene, camera, (updates) => {
+      if (updates.yaw !== undefined) state.yaw = updates.yaw;
+      if (updates.carSpeed !== undefined) state.carSpeed = updates.carSpeed;
+    });
+    scenarioEngineInitRef.current = true;
+
+    // Listen for scenario state changes
+    setOnScenarioStateChange(() => {
+      if (scenarioState.hasWon) {
+        setScenarioStatus('won');
+      } else if (scenarioState.hasLost) {
+        setScenarioStatus('lost');
+      } else if (scenarioState.isPlaying) {
+        setScenarioStatus('playing');
+      } else {
+        setScenarioStatus('idle');
+      }
+    });
+
+    // Load city.json buildings (individual meshes for correct colors)
     fetch('/city.json')
       .then(res => res.json())
       .then(data => {
@@ -461,10 +522,10 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
         console.log('[City] Loading city.json...');
         console.log('[City] Buildings:', data.buildings?.length || 0);
         console.log('[City] Streets:', data.streets?.length || 0);
-        if (data.tileWidth) console.log('[City] Tile size:', data.tileWidth, 'x', data.tileDepth);
 
         const buildings = data.buildings || [];
         let loaded = 0, failed = 0;
+
         for (const b of buildings) {
           try {
             const shape = new THREE.Shape();
@@ -485,9 +546,60 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
             failed++;
           }
         }
+
         console.log('[City] Loaded:', loaded, 'buildings');
         if (failed > 0) console.log('[City] Failed:', failed, 'buildings');
-        console.log('[City] Scene objects:', scene.children.length);
+
+        // Render streets (road surfaces + center lines)
+        const streets = data.streets || [];
+        if (streets.length > 0) {
+          const roadMaterial = new THREE.MeshStandardMaterial({ color: '#2a2a2a' });
+          const lineMaterial = new THREE.MeshStandardMaterial({ color: '#ffff00' });
+
+          for (const street of streets) {
+            try {
+              if (street.axis === 'z') {
+                // N-S street
+                const length = Math.abs(street.end - street.start);
+                const roadGeo = new THREE.PlaneGeometry(street.width, length);
+                roadGeo.rotateX(-Math.PI / 2);
+                const roadMesh = new THREE.Mesh(roadGeo, roadMaterial);
+                roadMesh.position.set(street.center, 0.02, (street.start + street.end) / 2);
+                scene.add(roadMesh);
+
+                // Dashed center line
+                for (let z = street.start; z < street.end; z += 5) {
+                  const lineGeo = new THREE.PlaneGeometry(0.3, 3);
+                  lineGeo.rotateX(-Math.PI / 2);
+                  const lineMesh = new THREE.Mesh(lineGeo, lineMaterial);
+                  lineMesh.position.set(street.center, 0.03, z + 1.5);
+                  scene.add(lineMesh);
+                }
+              } else {
+                // E-W street
+                const length = Math.abs(street.end - street.start);
+                const roadGeo = new THREE.PlaneGeometry(length, street.width);
+                roadGeo.rotateX(-Math.PI / 2);
+                const roadMesh = new THREE.Mesh(roadGeo, roadMaterial);
+                roadMesh.position.set((street.start + street.end) / 2, 0.02, street.center);
+                scene.add(roadMesh);
+
+                // Dashed center line
+                for (let x = street.start; x < street.end; x += 5) {
+                  const lineGeo = new THREE.PlaneGeometry(3, 0.3);
+                  lineGeo.rotateX(-Math.PI / 2);
+                  const lineMesh = new THREE.Mesh(lineGeo, lineMaterial);
+                  lineMesh.position.set(x + 1.5, 0.03, street.center);
+                  scene.add(lineMesh);
+                }
+              }
+            } catch (e) {
+              // skip bad street
+            }
+          }
+          console.log('[City] Rendered', streets.length, 'streets');
+        }
+
         console.log('[City] ========================================');
       })
       .catch(err => console.error('[City] Failed:', err));
@@ -581,6 +693,17 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
       direction.normalize();
       camera.position.add(direction.multiplyScalar(state.carSpeed));
 
+      // Update scenario entities and check for collisions/win conditions
+      const scenarioResult = updateScenario();
+      if (scenarioResult.won) {
+        setScenarioStatus('won');
+      } else if (scenarioResult.lost) {
+        setScenarioStatus('lost');
+      }
+
+      // Update shared state ref for external access
+      gameStateRef.current = { yaw: state.yaw, carSpeed: state.carSpeed };
+
       // Grid follows camera
       grid.position.x = Math.round(camera.position.x / 20) * 20;
       grid.position.z = Math.round(camera.position.z / 20) * 20;
@@ -646,23 +769,43 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
 
       {/* Debug panel - press 'p' to toggle */}
       {debugMode && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 16,
-            left: 16,
-            background: 'rgba(0,0,0,0.7)',
-            color: '#fff',
-            padding: '12px 16px',
-            fontFamily: 'monospace',
-            fontSize: 12,
-            zIndex: 300,
-            borderRadius: 8,
-          }}
-        >
+        <div className="debug-panel">
           <div style={{ marginBottom: 4, color: '#888' }}>Debug Mode (P to hide)</div>
           <div>AI: {aiEnabled ? 'enabled' : 'disabled'}</div>
           <div>Status: {aiStatus}</div>
+          <div style={{ marginTop: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
+            <div>Scenario: {activeScenario?.name || 'none'}</div>
+            <div>Result: <span style={{ color: scenarioStatus === 'won' ? '#4caf50' : scenarioStatus === 'lost' ? '#f44336' : '#fff' }}>{scenarioStatus}</span></div>
+            <div style={{ marginTop: 8 }}>
+              <select
+                style={{
+                  background: '#333',
+                  color: '#fff',
+                  border: '1px solid #555',
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  width: '100%',
+                  marginBottom: 6,
+                }}
+                value={activeScenario?.id || ''}
+                onChange={(e) => {
+                  if (e.target.value) handleStartScenario(e.target.value);
+                }}
+              >
+                <option value="">-- Select Scenario --</option>
+                {sampleScenarios.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scenario status overlay (win/lose) - only in debug mode */}
+      {debugMode && (scenarioStatus === 'won' || scenarioStatus === 'lost') && (
+        <div className={`scenario-status-overlay ${scenarioStatus}`}>
+          {scenarioStatus === 'won' ? 'SCENARIO COMPLETE' : 'COLLISION DETECTED'}
         </div>
       )}
 
