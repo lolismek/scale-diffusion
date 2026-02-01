@@ -1,0 +1,12 @@
+[project]
+name = "scale-diffusion-backend"
+version = "0.1.0"
+description = "CILRS training data pipeline for Scale Diffusion"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3>=1.35.0",
+    "ffmpeg-python>=0.2.0",
+]
+
+[project.scripts]
+process-session = "scripts.process_session:main"
