@@ -90,3 +90,15 @@ export function resetCarPhysics(): void {
   euler.set(0, state.yaw, 0);
   camera.quaternion.setFromEuler(euler);
 }
+
+/**
+ * Teleport the player to a specific position and rotation
+ */
+export function setPlayerPosition(x: number, z: number, yaw: number): void {
+  camera.position.set(x, 1.6, z);
+  state.yaw = yaw;
+  state.pitch = 0;
+  state.carSpeed = 0;
+  euler.set(0, yaw, 0);
+  camera.quaternion.setFromEuler(euler);
+}

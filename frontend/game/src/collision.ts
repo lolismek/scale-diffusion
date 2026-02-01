@@ -1,5 +1,6 @@
 import { camera } from './engine';
 import { state } from './state';
+import { checkScenarioEntityCollision } from './scenarios';
 
 // Car collision radius (distance from center to edge)
 const CAR_RADIUS = 0.5;
@@ -157,7 +158,11 @@ function checkBlockCollision(x: number, z: number, radius: number): boolean {
  * Check if a position would cause a collision
  */
 export function checkCollision(x: number, z: number): boolean {
-  return checkBuildingCollision(x, z, CAR_RADIUS) || checkBlockCollision(x, z, CAR_RADIUS);
+  return (
+    checkBuildingCollision(x, z, CAR_RADIUS) ||
+    checkBlockCollision(x, z, CAR_RADIUS) ||
+    checkScenarioEntityCollision(x, z)
+  );
 }
 
 /**

@@ -3,12 +3,14 @@ import { composer } from './engine';
 import { updateTiles } from './tiling';
 import { state } from './state';
 import { createGround } from './ground';
-import { initBlocks, addBlock } from './blocks';
+import { initBlocks } from './blocks';
 import { setOnSelectionChanged, deselectBlock, updateSelectionOutline, updateOutline } from './selection';
 import { initControls, updateMovement } from './controls';
-import { initUI, refreshBlockList } from './ui';
-import { initIO } from './io';
+import { initUI, refreshBlockList, initScenarioUI } from './ui';
+import { initIO, loadScene } from './io';
 import { initAI } from './ai';
+import { updateScenario } from './scenarios';
+import { camera } from './engine';
 
 // Initialize ground
 createGround();
@@ -35,18 +37,30 @@ setOnSelectionChanged(refreshBlockList);
 // Initialize subsystems
 initControls();
 initUI();
+initScenarioUI();
 initIO();
 initAI();
 
-// Initial blocks
-addBlock(10, 10, 5, 8, 5, '#888888');
-addBlock(-10, 5, 3, 12, 3, '#888888');
-addBlock(0, -15, 6, 6, 6, '#888888');
+// Load default map (manhattan)
+async function loadDefaultMap() {
+  try {
+    const response = await fetch('/builds/manhattan_clean_dashes.json');
+    const data = await response.json();
+    loadScene(data);
+    // Position camera on a road (Z-axis street with center at X=-1102.9)
+    camera.position.set(-1099, 1.6, -900);
+    state.yaw = 0; // Face north (along +Z)
+  } catch (e) {
+    console.warn('Could not load default map:', e);
+  }
+}
+loadDefaultMap();
 
 // Animation loop
 function animate(): void {
   requestAnimationFrame(animate);
   updateMovement();
+  updateScenario();
   updateTiles();
   updateOutline();
   composer.render();

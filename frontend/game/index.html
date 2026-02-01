@@ -7,6 +7,33 @@
 </head>
 <body>
   <div id="sidebar">
+    <h2>Scenarios</h2>
+    <div class="section">
+      <select id="scenarioSelect">
+        <option value="">-- Select Scenario --</option>
+      </select>
+      <div id="scenarioDesc" class="scenario-desc">Select a scenario to begin</div>
+      <button class="btn-scenario" id="scenarioStartBtn">Start Scenario</button>
+      <div id="scenarioControls" class="scenario-controls">
+        <div class="scenario-info">
+          <div class="scenario-stat">
+            <span class="label">Time</span>
+            <span id="scenarioTimer" class="value">--:--</span>
+          </div>
+          <div class="scenario-stat">
+            <span class="label">Collisions</span>
+            <span id="scenarioCollisions" class="value">0</span>
+          </div>
+        </div>
+        <div id="scenarioStatus" class="scenario-status">No active scenario</div>
+        <div class="scenario-buttons">
+          <button class="btn-small" id="scenarioPauseBtn">Pause</button>
+          <button class="btn-small" id="scenarioRestartBtn">Restart</button>
+          <button class="btn-small btn-stop" id="scenarioStopBtn">Stop</button>
+        </div>
+      </div>
+    </div>
+
     <button id="modeBtn">Mode: Explore</button>
     <button id="driveBtn">Car Mode</button>
 
@@ -66,6 +93,10 @@
 
   <div id="canvasContainer">
     <div id="modeIndicator">Explore Mode — Click to look around</div>
+    <div id="scenarioHUD" class="scenario-hud">
+      <div class="hud-timer" id="hudTimer">--:--</div>
+      <div class="hud-status" id="hudStatus"></div>
+    </div>
     <video id="aiVideo" autoplay playsinline muted></video>
   </div>
 
