@@ -4,6 +4,7 @@ import { state } from './state';
 import { addBlock, clearBlocks } from './blocks';
 import { addBuilding, clearBuildings } from './buildings';
 import { addStreets, clearStreets } from './streets';
+import { addStreetPolygon, clearStreetPolygons } from './streetPolygons';
 import { setTileTemplate, clearTiles } from './tiling';
 import { deselectBlock } from './selection';
 import { createGround } from './ground';
@@ -15,6 +16,7 @@ export function loadScene(data: SceneData): void {
   deselectBlock();
   clearBuildings();
   clearStreets();
+  clearStreetPolygons();
   clearTiles();
 
   if (data.map) {
@@ -50,6 +52,11 @@ export function loadScene(data: SceneData): void {
     }
     if (data.streets) {
       addStreets(data.streets);
+    }
+    if (data.cleanedStreets) {
+      data.cleanedStreets.forEach(s => {
+        addStreetPolygon(s.vertices, s.color);
+      });
     }
   }
 
