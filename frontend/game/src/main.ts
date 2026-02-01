@@ -1,5 +1,5 @@
 import './style.css';
-import { renderer, scene, camera } from './engine';
+import { composer } from './engine';
 import { state } from './state';
 import { createGround } from './ground';
 import { initBlocks, addBlock } from './blocks';
@@ -47,6 +47,6 @@ function animate(): void {
   requestAnimationFrame(animate);
   updateMovement();
   updateOutline();
-  renderer.render(scene, camera);
+  composer.render();
 }
 animate();
