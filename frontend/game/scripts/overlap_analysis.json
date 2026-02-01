@@ -1,0 +1,9 @@
+{
+  "streets_area": 1489300.0,
+  "buildings_area": 2701606.7874372294,
+  "internal_area": 3798308.0000000014,
+  "street_building_overlap_area": 23516.250780284678,
+  "street_overlap_percentage": 1.5790136829574082,
+  "internal_building_coverage": 2675345.006793786,
+  "internal_coverage_percentage": 70.43517815811106
+}

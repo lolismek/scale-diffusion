@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene, camera } from './engine';
 import { getGround } from './ground';
+import { setCollisionTemplate } from './collision';
 import type { SceneData, StreetCorridor } from './types';
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -41,6 +42,13 @@ export function setTileTemplate(data: SceneData): void {
   };
   lastCx = NaN;
   lastCz = NaN;
+
+  // Sync collision template with building data
+  setCollisionTemplate({
+    buildings: template.buildings,
+    tileWidth: template.tileWidth,
+    tileDepth: template.tileDepth,
+  });
 }
 
 export function updateTiles(): void {
@@ -98,6 +106,7 @@ export function clearTiles(): void {
   template = null;
   lastCx = NaN;
   lastCz = NaN;
+  setCollisionTemplate(null);
 }
 
 // ── Tile creation ────────────────────────────────────────────────────────────

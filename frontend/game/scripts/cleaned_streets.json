@@ -1,0 +1,7 @@
+{
+  "original_street_area": 1489300.0,
+  "cleaned_street_area": 1465783.7492197154,
+  "removed_area": 23516.250780284638,
+  "removed_percentage": 1.5790136829574053,
+  "num_cleaned_polygons": 5
+}

@@ -33,11 +33,18 @@ export interface StreetCorridor {
   interrupts: number[][];
 }
 
+export interface StreetPolygon {
+  vertices: number[][];
+  color: string;
+  mesh: THREE.Mesh;
+}
+
 export interface SceneData {
   map?: Partial<MapSettings>;
   blocks?: Array<Omit<Block, 'mesh'>>;
   buildings?: Array<Omit<Building, 'mesh'>>;
   streets?: StreetCorridor[];
+  cleanedStreets?: Array<Omit<StreetPolygon, 'mesh'>>;
   tileWidth?: number;
   tileDepth?: number;
 }

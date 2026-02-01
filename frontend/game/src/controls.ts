@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { camera, renderer } from './engine';
 import { state } from './state';
+import { resolveMovement } from './collision';
 
 const euler = new THREE.Euler(0, 0, 0, 'YXZ');
 const direction = new THREE.Vector3();
@@ -54,7 +55,20 @@ export function updateMovement(): void {
     camera.getWorldDirection(direction);
     direction.y = 0;
     direction.normalize();
-    camera.position.add(direction.multiplyScalar(state.carSpeed));
+
+    // Calculate target position
+    const targetX = camera.position.x + direction.x * state.carSpeed;
+    const targetZ = camera.position.z + direction.z * state.carSpeed;
+
+    // Resolve collision and get valid position
+    const resolved = resolveMovement(camera.position.x, camera.position.z, targetX, targetZ);
+    camera.position.x = resolved.x;
+    camera.position.z = resolved.z;
+
+    // Reduce speed on collision (simulates hitting something)
+    if (resolved.collided) {
+      state.carSpeed *= 0.5;
+    }
   } else {
     // Creative fly mode
     camera.getWorldDirection(direction);

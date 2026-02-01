@@ -1,8 +1,9 @@
-import type { Block, Building, MapSettings } from './types';
+import type { Block, Building, MapSettings, StreetPolygon } from './types';
 
 export const state = {
   blocks: [] as Block[],
   buildings: [] as Building[],
+  streetPolygons: [] as StreetPolygon[],
   mapSettings: {
     width: 100,
     depth: 100,
