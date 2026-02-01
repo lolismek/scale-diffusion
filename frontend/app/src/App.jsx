@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Video2Ascii from 'video2ascii'
 import ShapeBlur from './components/ShapeBlur'
+import GameCanvas from './components/GameCanvas'
 import './App.css'
 
 // Validate Solana address format (base58, 32-44 chars)
@@ -43,6 +44,7 @@ function App() {
   const [showInput, setShowInput] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showFastfetch, setShowFastfetch] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('New York City realistic buildings, streets, and urban texture')
   const inputRef = useRef(null)
 
   // Show fastfetch then input
@@ -168,7 +170,11 @@ function App() {
       {isConnected && (
         <div className="tv-container">
           <div className="game-frame">
-            {/* Game will load here */}
+            <GameCanvas
+              className="game-canvas"
+              apiKey={import.meta.env.VITE_DECART_API_KEY}
+              prompt={aiPrompt}
+            />
           </div>
           <div className="shape-blur-container">
             <ShapeBlur

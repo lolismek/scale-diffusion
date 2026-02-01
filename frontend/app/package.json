@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@decartai/sdk": "^0.0.40",
     "events": "^3.3.0",
     "gl-matrix": "^3.4.4",
     "motion": "^12.26.2",
