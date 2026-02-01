@@ -8,6 +8,8 @@ import { resetCarPhysics } from './controls';
 import { scene } from './engine';
 import {
   sampleScenarios,
+  allScenarios,
+  commonroadScenarios,
   startScenario,
   stopScenario,
   togglePause,
@@ -156,17 +158,32 @@ export function initScenarioUI(): void {
   const collisionsDiv = document.getElementById('scenarioCollisions')!;
   const controlsDiv = document.getElementById('scenarioControls')!;
 
-  // Populate scenario dropdown
+  // Populate scenario dropdown with optgroups
+  const handcraftedGroup = document.createElement('optgroup');
+  handcraftedGroup.label = 'Hand-crafted';
   sampleScenarios.forEach(scenario => {
     const option = document.createElement('option');
     option.value = scenario.id;
     option.textContent = scenario.name;
-    scenarioSelect.appendChild(option);
+    handcraftedGroup.appendChild(option);
   });
+  scenarioSelect.appendChild(handcraftedGroup);
+
+  if (commonroadScenarios.length > 0) {
+    const crGroup = document.createElement('optgroup');
+    crGroup.label = 'CommonRoad';
+    commonroadScenarios.forEach(scenario => {
+      const option = document.createElement('option');
+      option.value = scenario.id;
+      option.textContent = scenario.name;
+      crGroup.appendChild(option);
+    });
+    scenarioSelect.appendChild(crGroup);
+  }
 
   // Update description when selection changes
   scenarioSelect.addEventListener('change', () => {
-    const scenario = sampleScenarios.find(s => s.id === scenarioSelect.value);
+    const scenario = allScenarios.find(s => s.id === scenarioSelect.value);
     const descEl = document.getElementById('scenarioDesc')!;
     if (scenario) {
       descEl.textContent = scenario.description;
@@ -177,7 +194,7 @@ export function initScenarioUI(): void {
 
   // Start scenario
   startBtn.addEventListener('click', () => {
-    const scenario = sampleScenarios.find(s => s.id === scenarioSelect.value);
+    const scenario = allScenarios.find(s => s.id === scenarioSelect.value);
     if (scenario) {
       // Switch to explore mode and drive mode
       state.mode = 'explore';

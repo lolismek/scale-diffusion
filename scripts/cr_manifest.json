@@ -1,0 +1,752 @@
+[
+  {
+    "file": "DEU_B471-1_1_T-1.xml",
+    "scenario_id": "DEU_B471-1_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.TWO_LANE",
+      "Tag.ONCOMING_TRAFFIC",
+      "Tag.URBAN",
+      "Tag.COMFORT",
+      "Tag.PARALLEL_LANES",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 2,
+    "max_lanes": 2,
+    "obstacle_count": 2,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 50,
+    "duration_s": 5.0,
+    "x_range": [
+      -181.0,
+      212.9
+    ],
+    "y_range": [
+      -88.7,
+      93.7
+    ],
+    "x_span": 393.9,
+    "y_span": 182.4,
+    "primary_angle_deg": -155.4,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 18.0,
+    "compatibility_score": 100
+  },
+  {
+    "file": "DEU_Muc-2_1_T-1.xml",
+    "scenario_id": "DEU_Muc-2_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.TWO_LANE",
+      "Tag.URBAN",
+      "Tag.COMFORT",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 2,
+    "max_lanes": 1,
+    "obstacle_count": 4,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 30,
+    "duration_s": 3.0,
+    "x_range": [
+      -366.3,
+      123.5
+    ],
+    "y_range": [
+      -25.4,
+      61.6
+    ],
+    "x_span": 489.8,
+    "y_span": 87.0,
+    "primary_angle_deg": 170.3,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 14.0,
+    "compatibility_score": 100
+  },
+  {
+    "file": "DEU_Muc-2_2_T-1.xml",
+    "scenario_id": "DEU_Muc-2_2_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.TWO_LANE",
+      "Tag.URBAN",
+      "Tag.COMFORT",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 2,
+    "max_lanes": 1,
+    "obstacle_count": 4,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 30,
+    "duration_s": 3.0,
+    "x_range": [
+      -366.3,
+      123.5
+    ],
+    "y_range": [
+      -25.4,
+      61.6
+    ],
+    "x_span": 489.8,
+    "y_span": 87.0,
+    "primary_angle_deg": 170.3,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 14.0,
+    "compatibility_score": 100
+  },
+  {
+    "file": "DEU_Muc-4_1_T-1.xml",
+    "scenario_id": "DEU_Muc-4_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.TWO_LANE",
+      "Tag.URBAN",
+      "Tag.COMFORT",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 2,
+    "max_lanes": 2,
+    "obstacle_count": 2,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 50,
+    "duration_s": 5.0,
+    "x_range": [
+      -129.1,
+      367.0
+    ],
+    "y_range": [
+      -4.2,
+      18.3
+    ],
+    "x_span": 496.1,
+    "y_span": 22.5,
+    "primary_angle_deg": 2.3,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 14.0,
+    "compatibility_score": 100
+  },
+  {
+    "file": "DEU_Muc-4_2_T-1.xml",
+    "scenario_id": "DEU_Muc-4_2_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.TWO_LANE",
+      "Tag.URBAN",
+      "Tag.COMFORT",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 2,
+    "max_lanes": 2,
+    "obstacle_count": 2,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 50,
+    "duration_s": 5.0,
+    "x_range": [
+      -129.1,
+      367.0
+    ],
+    "y_range": [
+      -4.2,
+      18.3
+    ],
+    "x_span": 496.1,
+    "y_span": 22.5,
+    "primary_angle_deg": 2.3,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 14.0,
+    "compatibility_score": 100
+  },
+  {
+    "file": "ZAM_Tjunction-1_100_T-1.xml",
+    "scenario_id": "ZAM_Tjunction-1_100_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.INTERSECTION",
+      "Tag.TURN_LEFT",
+      "Tag.TWO_LANE",
+      "Tag.ONCOMING_TRAFFIC",
+      "Tag.URBAN"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 2,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 147,
+    "duration_s": 14.7,
+    "x_range": [
+      -132.0,
+      100.5
+    ],
+    "y_range": [
+      -36.6,
+      183.0
+    ],
+    "x_span": 232.5,
+    "y_span": 219.7,
+    "primary_angle_deg": 110.4,
+    "has_planning_problem": true,
+    "initial_position": [
+      -4.14,
+      0.17
+    ],
+    "initial_velocity": 2.48,
+    "compatibility_score": 100
+  },
+  {
+    "file": "ZAM_Tjunction-1_150_T-1.xml",
+    "scenario_id": "ZAM_Tjunction-1_150_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.INTERSECTION",
+      "Tag.TURN_LEFT",
+      "Tag.TWO_LANE",
+      "Tag.ONCOMING_TRAFFIC",
+      "Tag.URBAN"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 2,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 147,
+    "duration_s": 14.7,
+    "x_range": [
+      -132.0,
+      100.5
+    ],
+    "y_range": [
+      -36.6,
+      183.0
+    ],
+    "x_span": 232.5,
+    "y_span": 219.7,
+    "primary_angle_deg": 110.4,
+    "has_planning_problem": true,
+    "initial_position": [
+      -27.85,
+      -0.68
+    ],
+    "initial_velocity": 5.16,
+    "compatibility_score": 100
+  },
+  {
+    "file": "ZAM_Tjunction-1_42_T-1.xml",
+    "scenario_id": "ZAM_Tjunction-1_42_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.INTERSECTION",
+      "Tag.TURN_LEFT",
+      "Tag.TWO_LANE",
+      "Tag.ONCOMING_TRAFFIC",
+      "Tag.URBAN"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 2,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 147,
+    "duration_s": 14.7,
+    "x_range": [
+      -132.0,
+      100.5
+    ],
+    "y_range": [
+      -36.6,
+      183.0
+    ],
+    "x_span": 232.5,
+    "y_span": 219.7,
+    "primary_angle_deg": 110.4,
+    "has_planning_problem": true,
+    "initial_position": [
+      -10.07,
+      0.4
+    ],
+    "initial_velocity": 5.63,
+    "compatibility_score": 100
+  },
+  {
+    "file": "ZAM_Tjunction-1_60_T-1.xml",
+    "scenario_id": "ZAM_Tjunction-1_60_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.INTERSECTION",
+      "Tag.TURN_LEFT",
+      "Tag.TWO_LANE",
+      "Tag.ONCOMING_TRAFFIC",
+      "Tag.URBAN"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 2,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 147,
+    "duration_s": 14.7,
+    "x_range": [
+      -132.0,
+      100.5
+    ],
+    "y_range": [
+      -36.6,
+      183.0
+    ],
+    "x_span": 232.5,
+    "y_span": 219.7,
+    "primary_angle_deg": 110.4,
+    "has_planning_problem": true,
+    "initial_position": [
+      -20.33,
+      -0.09
+    ],
+    "initial_velocity": 4.76,
+    "compatibility_score": 100
+  },
+  {
+    "file": "ZAM_Tjunction-1_80_T-1.xml",
+    "scenario_id": "ZAM_Tjunction-1_80_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.INTERSECTION",
+      "Tag.TURN_LEFT",
+      "Tag.TWO_LANE",
+      "Tag.ONCOMING_TRAFFIC",
+      "Tag.URBAN"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 2,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 147,
+    "duration_s": 14.7,
+    "x_range": [
+      -132.0,
+      100.5
+    ],
+    "y_range": [
+      -36.6,
+      183.0
+    ],
+    "x_span": 232.5,
+    "y_span": 219.7,
+    "primary_angle_deg": 110.4,
+    "has_planning_problem": true,
+    "initial_position": [
+      -23.89,
+      -0.35
+    ],
+    "initial_velocity": 4.76,
+    "compatibility_score": 100
+  },
+  {
+    "file": "DEU_Flensburg-5_1_T-1.xml",
+    "scenario_id": "DEU_Flensburg-5_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.CRITICAL",
+      "Tag.SIMULATED",
+      "Tag.INTERSECTION"
+    ],
+    "lanelet_count": 39,
+    "max_lanes": 2,
+    "obstacle_count": 40,
+    "obstacle_types": [
+      "ObstacleType.TRUCK",
+      "ObstacleType.BICYCLE",
+      "ObstacleType.BUS",
+      "ObstacleType.MOTORCYCLE",
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 100,
+    "duration_s": 10.0,
+    "x_range": [
+      273.9,
+      493.3
+    ],
+    "y_range": [
+      -460.6,
+      -178.1
+    ],
+    "x_span": 219.4,
+    "y_span": 282.5,
+    "primary_angle_deg": -97.1,
+    "has_planning_problem": true,
+    "initial_position": [
+      360.06,
+      -386.94
+    ],
+    "initial_velocity": 8.43,
+    "compatibility_score": 85
+  },
+  {
+    "file": "DEU_A9-2_1_T-1.xml",
+    "scenario_id": "DEU_A9-2_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 3,
+    "max_lanes": 3,
+    "obstacle_count": 2,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 50,
+    "duration_s": 5.0,
+    "x_range": [
+      -39.4,
+      387.3
+    ],
+    "y_range": [
+      -4.0,
+      7.5
+    ],
+    "x_span": 426.7,
+    "y_span": 11.5,
+    "primary_angle_deg": 0.6,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 33.0,
+    "compatibility_score": 75
+  },
+  {
+    "file": "DEU_A99-1_1_T-1.xml",
+    "scenario_id": "DEU_A99-1_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.LANE_FOLLOWING",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE"
+    ],
+    "lanelet_count": 3,
+    "max_lanes": 3,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 30,
+    "duration_s": 3.0,
+    "x_range": [
+      -674.6,
+      1774.4
+    ],
+    "y_range": [
+      -39.8,
+      118.4
+    ],
+    "x_span": 2448.9,
+    "y_span": 158.2,
+    "primary_angle_deg": 3.5,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 28.0,
+    "compatibility_score": 70
+  },
+  {
+    "file": "DEU_A99-1_2_T-1.xml",
+    "scenario_id": "DEU_A99-1_2_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SPEED_LIMIT",
+      "Tag.LANE_FOLLOWING",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE"
+    ],
+    "lanelet_count": 3,
+    "max_lanes": 3,
+    "obstacle_count": 5,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 30,
+    "duration_s": 3.0,
+    "x_range": [
+      -674.6,
+      1774.4
+    ],
+    "y_range": [
+      -39.8,
+      118.4
+    ],
+    "x_span": 2448.9,
+    "y_span": 158.2,
+    "primary_angle_deg": 3.5,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 28.0,
+    "compatibility_score": 70
+  },
+  {
+    "file": "USA_US101-10_3_T-1.xml",
+    "scenario_id": "USA_US101-10_3_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SLIP_ROAD",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.CRITICAL",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 6,
+    "obstacle_count": 44,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 80,
+    "duration_s": 8.0,
+    "x_range": [
+      -47.2,
+      108.0
+    ],
+    "y_range": [
+      -104.3,
+      49.6
+    ],
+    "x_span": 155.2,
+    "y_span": 153.8,
+    "primary_angle_deg": -44.5,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 9.34,
+    "compatibility_score": 60
+  },
+  {
+    "file": "USA_US101-14_1_T-1.xml",
+    "scenario_id": "USA_US101-14_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SLIP_ROAD",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 6,
+    "obstacle_count": 34,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 66,
+    "duration_s": 6.6,
+    "x_range": [
+      -57.6,
+      101.6
+    ],
+    "y_range": [
+      -89.5,
+      53.5
+    ],
+    "x_span": 159.1,
+    "y_span": 143.0,
+    "primary_angle_deg": -41.1,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 14.85,
+    "compatibility_score": 60
+  },
+  {
+    "file": "USA_US101-21_1_T-1.xml",
+    "scenario_id": "USA_US101-21_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SLIP_ROAD",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 6,
+    "obstacle_count": 30,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 80,
+    "duration_s": 8.0,
+    "x_range": [
+      -38.6,
+      122.1
+    ],
+    "y_range": [
+      -101.5,
+      41.6
+    ],
+    "x_span": 160.7,
+    "y_span": 143.1,
+    "primary_angle_deg": -41.3,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 13.58,
+    "compatibility_score": 60
+  },
+  {
+    "file": "USA_US101-25_1_T-1.xml",
+    "scenario_id": "USA_US101-25_1_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SLIP_ROAD",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 6,
+    "obstacle_count": 37,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 67,
+    "duration_s": 6.7,
+    "x_range": [
+      -43.6,
+      124.4
+    ],
+    "y_range": [
+      -98.8,
+      50.9
+    ],
+    "x_span": 168.0,
+    "y_span": 149.7,
+    "primary_angle_deg": -41.2,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 19.97,
+    "compatibility_score": 60
+  },
+  {
+    "file": "USA_US101-29_2_T-1.xml",
+    "scenario_id": "USA_US101-29_2_T-1",
+    "dt": 0.1,
+    "tags": [
+      "Tag.SLIP_ROAD",
+      "Tag.COMFORT",
+      "Tag.HIGHWAY",
+      "Tag.NO_ONCOMING_TRAFFIC",
+      "Tag.PARALLEL_LANES",
+      "Tag.MULTI_LANE",
+      "Tag.LANE_CHANGE"
+    ],
+    "lanelet_count": 12,
+    "max_lanes": 6,
+    "obstacle_count": 27,
+    "obstacle_types": [
+      "ObstacleType.CAR"
+    ],
+    "max_timestep": 48,
+    "duration_s": 4.8,
+    "x_range": [
+      -48.3,
+      86.2
+    ],
+    "y_range": [
+      -64.1,
+      56.2
+    ],
+    "x_span": 134.5,
+    "y_span": 120.4,
+    "primary_angle_deg": -41.2,
+    "has_planning_problem": true,
+    "initial_position": [
+      0.0,
+      0.0
+    ],
+    "initial_velocity": 15.96,
+    "compatibility_score": 60
+  }
+]

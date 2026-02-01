@@ -334,6 +334,11 @@ export const sampleScenarios: Scenario[] = [
   },
 ];
 
+// Re-export combined list with CommonRoad scenarios
+import { commonroadScenarios } from './commonroadScenarios';
+
+export const allScenarios: Scenario[] = [...sampleScenarios, ...commonroadScenarios];
+
 export function getScenarioById(id: string): Scenario | undefined {
-  return sampleScenarios.find(s => s.id === id);
+  return allScenarios.find(s => s.id === id);
 }
