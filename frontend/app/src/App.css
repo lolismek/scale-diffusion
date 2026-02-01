@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@200;300;400&display=swap');
 
 * {
   margin: 0;
@@ -21,6 +21,7 @@ html, body, #root {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  background: #000;
 }
 
 /* Background layers wrapper */
@@ -30,6 +31,12 @@ html, body, #root {
   left: 0;
   width: 100%;
   height: 100%;
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+
+.background-layers.visible {
+  opacity: 1;
 }
 
 /* Top and bottom edge fade to black */
@@ -88,127 +95,141 @@ html, body, #root {
   transform: translateY(-25%) scale(1.5);
 }
 
-/* Black overlay - covers everything initially */
-.black-overlay {
+/* Terminal */
+.terminal {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: #000000;
+  background: #000;
   z-index: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 1.2s ease-out;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.black-overlay.fade-out {
+.terminal.morphing {
   opacity: 0;
+}
+
+.terminal-content {
+  padding: 32px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.terminal-line {
+  white-space: pre;
+  min-height: 1.5em;
+  color: #ccc;
+}
+
+.fastfetch {
+  display: flex;
+  gap: 40px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ascii-logo {
+  margin: 0;
+  background: linear-gradient(180deg, #d4824a 0%, #666 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.info-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-line {
+  color: #888;
+}
+
+.info-line:first-child {
+  color: #d4824a;
+  margin-bottom: 16px;
+}
+
+.color-palettes {
+  margin-top: 16px;
+}
+
+.color-row {
+  line-height: 1.2;
+}
+
+
+.input-section {
+  margin-top: 48px;
+  color: #ccc;
+}
+
+.terminal-response {
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+.input-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.placeholder-text {
+  position: absolute;
+  color: #666;
   pointer-events: none;
 }
 
-/* Wallet form */
-.wallet-form {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+.terminal-input {
+  position: relative;
+  width: 100%;
 }
 
-.wallet-input {
-  width: 320px;
-  padding: 12px 16px;
-  background: transparent;
-  border: 1px solid #333;
-  border-radius: 4px;
-  color: #fff;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 300;
-  letter-spacing: 0.02em;
-  outline: none;
-  transition: border-color 0.2s ease;
+.separator-line {
+  color: #333;
+  margin: 12px 0;
 }
 
-.wallet-input::placeholder {
-  color: #555;
-}
-
-.wallet-input:focus {
-  border-color: #666;
-}
-
-.error-message {
-  color: #ff4444;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 300;
-}
-
-.play-button {
-  padding: 10px 32px;
-  background: transparent;
-  border: 1px solid #333;
-  border-radius: 4px;
-  color: #888;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 300;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.play-button:hover {
-  border-color: #666;
-  color: #fff;
-}
-
-/* Header */
-.header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 48px;
+.terminal-input-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  z-index: 600;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
 }
 
-.header-left,
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.prompt {
+  color: #d4824a;
+  margin-right: 8px;
 }
 
-.session-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 300;
+.command {
   color: #666;
-  letter-spacing: 0.05em;
 }
 
-.wallet-address {
-  font-family: 'Inter', monospace;
-  font-size: 12px;
-  font-weight: 400;
-  color: #888;
-  letter-spacing: 0.02em;
+.terminal-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #d4824a;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  caret-color: #d4824a;
+  width: 100%;
+  position: relative;
 }
 
-.status-dot {
-  width: 6px;
-  height: 6px;
-  background: #4ade80;
-  border-radius: 50%;
+.terminal-input::placeholder {
+  color: #333;
 }
+
+.terminal-error {
+  color: #ff6b6b;
+  margin-top: 4px;
+}
+
 
 /* TV container */
 .tv-container {
@@ -217,13 +238,13 @@ html, body, #root {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 400;
-  animation: tvFadeIn 0.8s ease-out 0.4s both;
+  animation: tvFadeIn 0.6s ease-out both;
 }
 
 @keyframes tvFadeIn {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.95);
+    transform: translate(-50%, -50%) scale(0.98);
   }
   to {
     opacity: 1;
@@ -235,13 +256,76 @@ html, body, #root {
   width: 960px;
   height: 540px;
   background: #000;
-  border: 1px solid #222;
+  border: 1px solid #1a1a1a;
   border-radius: 2px;
   box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header embedded in TV */
+.tv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.session-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #444;
+  letter-spacing: 0.05em;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-address {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 0.02em;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: #4ade80;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Game content area */
+.tv-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Mobile adjustments */
 @media (max-width: 1024px) {
+  .terminal {
+    width: 90vw;
+  }
+
+  .terminal.morphing {
+    width: 90vw;
+    min-height: calc(90vw * 9 / 16);
+  }
+
   .tv-screen {
     width: 90vw;
     height: calc(90vw * 9 / 16);
@@ -249,8 +333,9 @@ html, body, #root {
 }
 
 @media (max-width: 768px) {
-  .wallet-input {
-    width: 280px;
+  .terminal-content {
+    font-size: 12px;
+    padding: 20px;
   }
 
   .ascii-bg {

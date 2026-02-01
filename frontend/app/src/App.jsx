@@ -13,27 +13,25 @@ function truncateAddress(address) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`
 }
 
-// Fastfetch-style ASCII art and system info
-const FASTFETCH_LINES = [
-  '',
-  '       ██████╗ ██████╗  █████╗ ██╗     ',
-  '      ██╔═══██╗██╔══██╗██╔══██╗██║     ',
-  '      ██║   ██║██████╔╝███████║██║     ',
-  '      ██║   ██║██╔═══╝ ██╔══██║██║     ',
-  '      ╚██████╔╝██║     ██║  ██║███████╗',
-  '       ╚═════╝ ╚═╝     ╚═╝  ╚═╝╚══════╝',
-  '',
-  '  ─────────────────────────────────────',
-  '',
-  '  os        scale-diffusion v0.1.0',
-  '  host      browser runtime',
-  '  kernel    webgl 2.0',
-  '  uptime    loading...',
-  '  packages  diffusion-core, sol-wallet',
-  '  shell     opal-term',
-  '',
-  '  ─────────────────────────────────────',
-  '',
+// ASCII logo
+const ASCII_LOGO = `
+
+      .------.
+    .-..    ..--.
+   .:-        ..:=.
+   .-..        ..=.
+    .-.         ..- 
+      =.       -.=
+         '  -=      `
+
+// System info lines
+const INFO_LINES = [
+  { label: '', value: 'anon@scale-diffusion' },
+  { label: '', value: 'scale-diffusion v0.1' },
+  { label: '', value: 'browser runtime' },
+  { label: '', value: 'webgl 2.0' },
+  { label: '', value: 'scale-term' },
+  { label: '', value: 'awaiting wallet' },
 ]
 
 function App() {
@@ -41,25 +39,15 @@ function App() {
   const [inputValue, setInputValue] = useState('')
   const [error, setError] = useState('')
   const [isConnected, setIsConnected] = useState(false)
-  const [terminalLines, setTerminalLines] = useState([])
   const [showInput, setShowInput] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [showFastfetch, setShowFastfetch] = useState(false)
   const inputRef = useRef(null)
 
-  // Typewriter effect for fastfetch
+  // Show fastfetch then input
   useEffect(() => {
-    let lineIndex = 0
-    const interval = setInterval(() => {
-      if (lineIndex < FASTFETCH_LINES.length) {
-        setTerminalLines(prev => [...prev, FASTFETCH_LINES[lineIndex]])
-        lineIndex++
-      } else {
-        clearInterval(interval)
-        setTimeout(() => setShowInput(true), 300)
-      }
-    }, 50)
-
-    return () => clearInterval(interval)
+    setTimeout(() => setShowFastfetch(true), 100)
+    setTimeout(() => setShowInput(true), 600)
   }, [])
 
   // Focus input when it appears
@@ -85,7 +73,6 @@ function App() {
 
     setError('')
     setWalletAddress(trimmed)
-    setTerminalLines(prev => [...prev, `  > wallet ${trimmed}`, '', '  connecting...'])
     setShowInput(false)
 
     // Start transition
@@ -129,28 +116,50 @@ function App() {
       {!isConnected && (
         <div className={`terminal ${isTransitioning ? 'morphing' : ''}`}>
           <div className="terminal-content">
-            {terminalLines.map((line, i) => (
-              <div key={i} className="terminal-line">{line}</div>
-            ))}
+            {showFastfetch && (
+              <div className="fastfetch">
+                <pre className="ascii-logo">{ASCII_LOGO}</pre>
+                <div className="info-panel">
+                  {INFO_LINES.map((line, i) => (
+                    <div key={i} className="info-line">{line.value}</div>
+                  ))}
+                  <div className="color-palettes">
+                    <div className="color-row">
+                      <span style={{color: '#222'}}>███</span><span style={{color: '#3a3a3a'}}>███</span><span style={{color: '#555'}}>███</span><span style={{color: '#777'}}>███</span><span style={{color: '#999'}}>███</span><span style={{color: '#bbb'}}>███</span>
+                    </div>
+                    <div className="color-row">
+                      <span style={{color: '#5a3018'}}>███</span><span style={{color: '#7a4a2a'}}>███</span><span style={{color: '#9a5e38'}}>███</span><span style={{color: '#b87040'}}>███</span><span style={{color: '#d4824a'}}>███</span><span style={{color: '#e89858'}}>███</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showInput && (
-              <form className="terminal-input-line" onSubmit={handleSubmit}>
-                <span className="prompt">{'>'}</span>
-                <span className="command">wallet </span>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  className="terminal-input"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </form>
+              <div className="input-section">
+                <div className="terminal-line"><span className="prompt">{'>'}</span> how does this work?</div>
+                <div className="terminal-response">scale-diffusion: help us play games, generate training data, earn rewards</div>
+                <div className="separator-line">─────────────────────────────────────────────────────────────────────────</div>
+                <form className="terminal-input-line" onSubmit={handleSubmit}>
+                  <span className="prompt">$</span>
+                  <div className="input-wrapper">
+                    {!inputValue && <span className="placeholder-text">enter your solana wallet address</span>}
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      className="terminal-input"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                  </div>
+                </form>
+              </div>
             )}
 
             {error && (
-              <div className="terminal-error">  error: {error}</div>
+              <div className="terminal-error">error: {error}</div>
             )}
           </div>
         </div>
