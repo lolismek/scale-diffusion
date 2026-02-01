@@ -268,6 +268,6 @@ carla_garage/carla/
 
 # General ignores
 *.sif
-*.png
+
 *.mp4
 *.log
