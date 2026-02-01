@@ -12,7 +12,7 @@ export function createGround(): void {
   }
   ground = new THREE.Mesh(
     new THREE.PlaneGeometry(10000, 10000),
-    new THREE.MeshStandardMaterial({ color: state.mapSettings.color })
+    new THREE.MeshStandardMaterial({ color: state.mapSettings.color, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.userData.isGround = true;

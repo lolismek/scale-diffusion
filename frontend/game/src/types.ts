@@ -24,8 +24,18 @@ export interface MapSettings {
   skyColor: string;
 }
 
+export interface StreetCorridor {
+  axis: 'x' | 'z';
+  center: number;
+  width: number;
+  start: number;
+  end: number;
+  interrupts: number[][];
+}
+
 export interface SceneData {
   map?: Partial<MapSettings>;
   blocks?: Array<Omit<Block, 'mesh'>>;
   buildings?: Array<Omit<Building, 'mesh'>>;
+  streets?: StreetCorridor[];
 }

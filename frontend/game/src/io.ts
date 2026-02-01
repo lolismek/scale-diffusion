@@ -3,6 +3,7 @@ import { scene } from './engine';
 import { state } from './state';
 import { addBlock, clearBlocks } from './blocks';
 import { addBuilding, clearBuildings } from './buildings';
+import { addStreets, clearStreets } from './streets';
 import { deselectBlock } from './selection';
 import { createGround } from './ground';
 import { refreshBlockList } from './ui';
@@ -12,6 +13,7 @@ export function loadScene(data: SceneData): void {
   clearBlocks();
   deselectBlock();
   clearBuildings();
+  clearStreets();
 
   if (data.map) {
     state.mapSettings.width = data.map.width ?? 100;
@@ -36,6 +38,10 @@ export function loadScene(data: SceneData): void {
     data.buildings.forEach(b => {
       addBuilding(b.vertices, b.height, b.color);
     });
+  }
+
+  if (data.streets) {
+    addStreets(data.streets);
   }
 
   refreshBlockList();
