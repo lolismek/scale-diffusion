@@ -143,7 +143,10 @@ export default function VisionConsole() {
       });
 
       // Connect
-      const lkUrl = import.meta.env.VITE_LIVEKIT_URL || 'wss://stephen-uw4i9ncb.livekit.cloud';
+      const lkUrl = import.meta.env.VITE_LIVEKIT_URL;
+      if (!lkUrl) {
+        throw new Error('VITE_LIVEKIT_URL is not set. Add it to your .env file.');
+      }
       await room.connect(lkUrl, token);
 
       console.log('✓ LiveKit connection established');
@@ -395,7 +398,7 @@ export default function VisionConsole() {
 
       // Initialize Overshoot with complete configuration
       const vision = new RealtimeVision({
-        apiKey: 'ovs_d30c64306c87ac355f1bb73662f93fcc',
+        apiKey: import.meta.env.VITE_OVERSHOOT_API_KEY,
         apiUrl: 'https://cluster1.overshoot.ai/api/v0.2',
         prompt: currentPrompt,
         source: videoSource === 'camera'
