@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Video2Ascii from 'video2ascii'
+import ShapeBlur from './components/ShapeBlur'
 import './App.css'
 
 // Validate Solana address format (base58, 32-44 chars)
@@ -86,8 +87,8 @@ function App() {
 
   return (
     <div className="container">
-      {/* Background layers - always rendered, revealed when connected */}
-      <div className={`background-layers ${isConnected ? 'visible' : ''}`}>
+      {/* Background layers - always visible, terminal covers it */}
+      <div className="background-layers">
         <div className="fluid-overlay">
           <iframe
             src="/ribbons/index.html"
@@ -112,9 +113,8 @@ function App() {
         </div>
       </div>
 
-      {/* Terminal - morphs into TV */}
-      {!isConnected && (
-        <div className={`terminal ${isTransitioning ? 'morphing' : ''}`}>
+      {/* Terminal - morphs into TV, stays rendered to prevent flicker */}
+      <div className={`terminal ${isTransitioning ? 'morphing' : ''} ${isConnected ? 'hidden' : ''}`}>
           <div className="terminal-content">
             {showFastfetch && (
               <div className="fastfetch">
@@ -163,25 +163,23 @@ function App() {
             )}
           </div>
         </div>
-      )}
 
       {/* TV screen - appears when connected */}
       {isConnected && (
         <div className="tv-container">
-          <div className="tv-screen">
-            {/* Header embedded in TV */}
-            <div className="tv-header">
-              <span className="session-label">session active</span>
-              <div className="wallet-info">
-                <span className="wallet-address">{truncateAddress(walletAddress)}</span>
-                <span className="status-dot" />
-              </div>
-            </div>
-
-            {/* Game content area */}
-            <div className="tv-content">
-              {/* Game will load here */}
-            </div>
+          <div className="game-frame">
+            {/* Game will load here */}
+          </div>
+          <div className="shape-blur-container">
+            <ShapeBlur
+              variation={0}
+              pixelRatioProp={window.devicePixelRatio || 1}
+              shapeSize={1.3}
+              roundness={0}
+              borderSize={0.01}
+              circleSize={0.02}
+              circleEdge={1.7}
+            />
           </div>
         </div>
       )}
