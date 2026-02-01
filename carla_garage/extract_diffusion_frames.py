@@ -192,6 +192,97 @@ def load_camera_data(camera_path: Path, skip_ms: float) -> list[dict]:
     return filtered_events
 
 
+def compute_controls_from_physics(
+    measurements: list[dict],
+    dt: float = 0.2,  # Time between frames in seconds
+    friction: float = 0.1,  # Speed lost per second due to friction
+    max_accel: float = 5.0,  # Max acceleration in m/s^2
+    max_steer_rate: float = 0.5,  # Max yaw change per second in radians
+    target_speed: float = 8.0,  # Target cruising speed in m/s
+) -> list[dict]:
+    """
+    Compute throttle, brake, and steer from observed speed/yaw changes.
+    
+    The recorded throttle/brake/steer from keyboard state is often 0 even when
+    the car is moving (due to scenarios with initial momentum, or coasting).
+    This function infers the "expert" controls from the physics.
+    
+    Key insight: throttle should be proportional to (target_speed - current_speed)
+    to teach the model to accelerate when slow and maintain when at target.
+    """
+    import math
+    
+    if len(measurements) < 2:
+        return measurements
+    
+    result = []
+    for i, m in enumerate(measurements):
+        m = m.copy()
+        current_speed = m["speed"]
+        
+        # Compute target throttle based on speed deficit
+        # When speed is low, we need HIGH throttle to accelerate
+        # When speed is at target, we need LOW throttle to maintain
+        speed_deficit = target_speed - current_speed
+        
+        if i == 0:
+            # First frame: compute throttle from speed deficit
+            if speed_deficit > 0:
+                # Below target speed - need throttle proportional to deficit
+                m["throttle"] = min(1.0, max(0.3, speed_deficit / target_speed))
+            else:
+                m["throttle"] = 0.1  # Slight throttle to maintain
+            m["brake"] = 0.0
+            result.append(m)
+            continue
+        
+        prev = measurements[i - 1]
+        
+        # Compute speed change
+        speed_change = m["speed"] - prev["speed"]
+        
+        # Compute yaw change (steering)
+        yaw_change = m["theta"] - prev["theta"]
+        # Normalize to [-pi, pi]
+        while yaw_change > math.pi:
+            yaw_change -= 2 * math.pi
+        while yaw_change < -math.pi:
+            yaw_change += 2 * math.pi
+        
+        # Determine if we're braking (significant deceleration)
+        is_braking = speed_change < -1.0
+        
+        if is_braking:
+            # Car decelerated significantly -> brake
+            m["brake"] = min(1.0, abs(speed_change) / (max_accel * dt))
+            m["throttle"] = 0.0
+        elif speed_deficit > 0:
+            # Below target speed - throttle based on deficit
+            # More deficit = more throttle
+            # At speed=0, deficit=8, throttle should be high (0.8-1.0)
+            # At speed=6, deficit=2, throttle should be lower (0.3-0.4)
+            base_throttle = speed_deficit / target_speed  # 0-1 range
+            
+            # Boost for very low speeds (need more throttle to overcome inertia)
+            if current_speed < 2.0:
+                m["throttle"] = min(1.0, max(0.6, base_throttle + 0.3))
+            else:
+                m["throttle"] = min(1.0, max(0.2, base_throttle))
+            m["brake"] = 0.0
+        else:
+            # At or above target speed - minimal throttle
+            m["throttle"] = 0.1
+            m["brake"] = 0.0
+        
+        # Infer steering from yaw change
+        steer_value = yaw_change / (max_steer_rate * dt)
+        m["steer"] = max(-1.0, min(1.0, steer_value))
+        
+        result.append(m)
+    
+    return result
+
+
 def align_camera_to_frames(
     camera_events: list[dict],
     frame_count: int,
@@ -205,7 +296,7 @@ def align_camera_to_frames(
     - theta: Yaw orientation (radians)
     - speed: Vehicle speed (m/s)
     - command: Navigation command (1=Left, 2=Right, 3=Straight, 4=Follow Lane)
-    - steer, throttle, brake: Expert actions
+    - steer, throttle, brake: Expert actions (computed from physics)
     """
     if not camera_events or frame_count == 0:
         return []
@@ -231,6 +322,7 @@ def align_camera_to_frames(
             "theta": round(closest_event.get("yaw", 0), 6),
             "speed": round(closest_event.get("speed", 0), 4),
             "command": closest_event.get("command", 4),  # 1-4: Left, Right, Straight, Follow
+            # Store raw keyboard values temporarily - will be overwritten
             "steer": round(closest_event.get("steer", 0), 6),
             "throttle": round(float(closest_event.get("throttle", 0)), 4),
             "brake": round(float(closest_event.get("brake", 0)), 4),
@@ -238,7 +330,122 @@ def align_camera_to_frames(
         
         measurements.append(measurement)
     
+    # Compute controls from observed physics instead of keyboard state
+    dt = 1.0 / fps
+    measurements = compute_controls_from_physics(measurements, dt=dt)
+    
+    # Round the computed values
+    for m in measurements:
+        m["steer"] = round(m["steer"], 6)
+        m["throttle"] = round(m["throttle"], 4)
+        m["brake"] = round(m["brake"], 4)
+    
     return measurements
+
+
+def balance_data(
+    measurements: list[dict],
+    rgb_dir: Path,
+    max_zero_throttle_ratio: float = 0.5,
+    keep_every_n_stationary: int = 3,
+) -> tuple[list[dict], list[int]]:
+    """
+    Balance the dataset by reducing frames where throttle=0 and car is stationary.
+    
+    Returns:
+        - Balanced measurements list
+        - List of frame indices to keep
+    """
+    if not measurements:
+        return measurements, []
+    
+    # Separate frames into "driving" (throttle > 0 or steering) and "stationary"
+    driving_indices = []
+    stationary_indices = []
+    
+    for i, m in enumerate(measurements):
+        throttle = m.get("throttle", 0)
+        steer = abs(m.get("steer", 0))
+        speed = m.get("speed", 0)
+        brake = m.get("brake", 0)
+        
+        # Frame is "active" if:
+        # - Has throttle > 0.1
+        # - OR significant steering (|steer| > 0.1)
+        # - OR braking
+        # - OR car is moving (speed > 1 m/s)
+        is_active = throttle > 0.1 or steer > 0.1 or brake > 0.1 or speed > 1.0
+        
+        if is_active:
+            driving_indices.append(i)
+        else:
+            stationary_indices.append(i)
+    
+    print(f"    Active frames: {len(driving_indices)}, Stationary frames: {len(stationary_indices)}")
+    
+    # Calculate how many stationary frames to keep
+    # Target: stationary frames should be at most max_zero_throttle_ratio of total
+    if len(driving_indices) == 0:
+        # No driving frames - keep some stationary frames
+        keep_stationary = stationary_indices[::keep_every_n_stationary]
+    else:
+        # Calculate target number of stationary frames
+        target_stationary = int(len(driving_indices) * max_zero_throttle_ratio / (1 - max_zero_throttle_ratio))
+        
+        if len(stationary_indices) <= target_stationary:
+            # Keep all stationary frames
+            keep_stationary = stationary_indices
+        else:
+            # Subsample stationary frames evenly
+            step = max(1, len(stationary_indices) // target_stationary)
+            keep_stationary = stationary_indices[::step][:target_stationary]
+    
+    # Combine and sort
+    keep_indices = sorted(driving_indices + keep_stationary)
+    
+    print(f"    Keeping {len(keep_indices)} frames ({len(driving_indices)} active + {len(keep_stationary)} stationary)")
+    
+    # Create balanced measurements with renumbered frames
+    balanced_measurements = []
+    for new_idx, old_idx in enumerate(keep_indices):
+        m = measurements[old_idx].copy()
+        m["frame"] = new_idx
+        m["original_frame"] = old_idx
+        balanced_measurements.append(m)
+    
+    return balanced_measurements, keep_indices
+
+
+def reorganize_frames(rgb_dir: Path, keep_indices: list[int]) -> int:
+    """
+    Reorganize frames to only keep balanced subset.
+    Renumbers frames to be sequential (0000.jpg, 0001.jpg, ...).
+    
+    Returns number of frames kept.
+    """
+    import shutil
+    import tempfile
+    
+    # Create temp directory for reorganization
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        
+        # Move kept frames to temp with new numbering
+        for new_idx, old_idx in enumerate(keep_indices):
+            old_file = rgb_dir / f"{old_idx:04d}.jpg"
+            if old_file.exists():
+                tmp_file = tmp_path / f"{new_idx:04d}.jpg"
+                shutil.copy2(old_file, tmp_file)
+        
+        # Clear original directory
+        for f in rgb_dir.glob("*.jpg"):
+            f.unlink()
+        
+        # Move back from temp
+        for f in tmp_path.glob("*.jpg"):
+            shutil.copy2(f, rgb_dir / f.name)
+    
+    return len(keep_indices)
 
 
 def write_session_data(
@@ -250,22 +457,41 @@ def write_session_data(
     skip_seconds: float,
     output_width: int,
     output_height: int,
-):
+    balance: bool = True,
+) -> int:
     """
     Write CILRS-formatted dataset files.
     
     Creates:
     - route_<session_id>/measurements.json (CILRS format)
     - route_<session_id>/metadata.json (session info for reference)
+    
+    Returns:
+        Final frame count after balancing
     """
     route_dir = output_dir / f"route_{session_id}"
+    rgb_dir = route_dir / "rgb_front"
     route_dir.mkdir(parents=True, exist_ok=True)
+    
+    final_frame_count = frame_count
+    final_measurements = measurements
+    
+    # Balance data if requested
+    if balance and measurements:
+        print(f"  Balancing data...")
+        balanced_measurements, keep_indices = balance_data(measurements, rgb_dir)
+        
+        if keep_indices and len(keep_indices) < frame_count:
+            # Reorganize frames to match balanced measurements
+            final_frame_count = reorganize_frames(rgb_dir, keep_indices)
+            final_measurements = balanced_measurements
+            print(f"  Balanced: {frame_count} -> {final_frame_count} frames")
     
     # Write measurements.json in CILRS format
     # This is the main file used by carla_garage DataAgent
     measurements_path = route_dir / "measurements.json"
     with open(measurements_path, "w") as f:
-        json.dump(measurements, f, indent=2)
+        json.dump(final_measurements, f, indent=2)
     
     # Write metadata.json for reference (not used by CILRS but helpful)
     metadata = {
@@ -273,14 +499,18 @@ def write_session_data(
         "prompt": meta.get("prompt", ""),
         "original_duration_ms": meta.get("duration", 0),
         "scenario": meta.get("scenario", {}),
-        "frame_count": frame_count,
+        "frame_count": final_frame_count,
+        "original_frame_count": frame_count,
         "skipped_seconds": skip_seconds,
         "image_size": [output_width, output_height],
+        "balanced": balance,
     }
     
     metadata_path = route_dir / "metadata.json"
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
+    
+    return final_frame_count
 
 
 def write_global_manifest(
@@ -311,6 +541,7 @@ def process_session(
     skip_seconds: float,
     output_width: int,
     output_height: int,
+    balance: bool = True,
 ) -> dict | None:
     """
     Process a single session: extract frames and create metadata.
@@ -395,16 +626,17 @@ def process_session(
         except Exception as e:
             print(f"  Warning: Could not process camera data: {e}")
     
-    # Write CILRS dataset files
-    write_session_data(
+    # Write CILRS dataset files (with optional balancing)
+    final_frame_count = write_session_data(
         output_dir, session_id, meta, frame_count, measurements,
-        skip_seconds, output_width, output_height
+        skip_seconds, output_width, output_height, balance=balance
     )
     
     return {
         "session_id": session_id,
         "prompt": meta.get("prompt", ""),
-        "frame_count": frame_count,
+        "frame_count": final_frame_count,
+        "original_frame_count": frame_count,
         "original_duration": duration_ms,
     }
 
@@ -445,6 +677,17 @@ def main():
         "--session",
         help="Process only a specific session ID"
     )
+    parser.add_argument(
+        "--no-balance",
+        action="store_true",
+        help="Disable data balancing (keep all frames)"
+    )
+    parser.add_argument(
+        "--balance-ratio",
+        type=float,
+        default=0.5,
+        help="Max ratio of stationary frames after balancing (default: 0.5)"
+    )
     
     args = parser.parse_args()
     
@@ -452,6 +695,7 @@ def main():
     skip_seconds = args.skip_seconds
     output_width = args.width
     output_height = args.height
+    balance = not args.no_balance
     
     # Resolve paths
     script_dir = Path(__file__).parent
@@ -472,11 +716,12 @@ def main():
     print("=" * 60)
     print("CILRS Training Data Extraction")
     print("=" * 60)
-    print(f"Input:  {input_dir}")
-    print(f"Output: {output_dir}")
-    print(f"Skip:   {skip_seconds}s (~{int(skip_seconds * DEFAULT_VIDEO_FPS)} frames @ ~{DEFAULT_VIDEO_FPS}fps)")
-    print(f"Size:   {output_width}x{output_height}")
-    print(f"Format: route_<session>/rgb_front/*.jpg + measurements.json")
+    print(f"Input:   {input_dir}")
+    print(f"Output:  {output_dir}")
+    print(f"Skip:    {skip_seconds}s (~{int(skip_seconds * DEFAULT_VIDEO_FPS)} frames @ ~{DEFAULT_VIDEO_FPS}fps)")
+    print(f"Size:    {output_width}x{output_height}")
+    print(f"Balance: {'Yes (reduce stationary frames)' if balance else 'No'}")
+    print(f"Format:  route_<session>/rgb_front/*.jpg + measurements.json")
     print("=" * 60)
     
     # Find all sessions
@@ -494,7 +739,8 @@ def main():
     for session_id, files in sorted(sessions.items()):
         summary = process_session(
             session_id, files, output_dir,
-            skip_seconds, output_width, output_height
+            skip_seconds, output_width, output_height,
+            balance=balance
         )
         if summary:
             session_summaries.append(summary)

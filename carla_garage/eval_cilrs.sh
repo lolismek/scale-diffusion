@@ -1,37 +1,59 @@
 #!/bin/bash
 # Evaluate a CILRS model on CARLA
-# Usage: ./eval_cilrs.sh <model_folder> [routes_file] [--debug]
+# Usage: ./eval_cilrs.sh <model_folder> [options]
+#
+# Options:
+#   --routes <file>      Routes XML file (default: leaderboard/data/debug.xml)
+#   --checkpoint <name>  Checkpoint file to use (default: model_best.pth)
+#   --debug              Save visualization frames
 #
 # Examples:
-#   ./eval_cilrs.sh logs/cilrs_exp1
-#   ./eval_cilrs.sh logs/cilrs_exp1 leaderboard/data/debug.xml
-#   ./eval_cilrs.sh logs/cilrs_exp1 --debug    # Save visualization frames
+#   ./eval_cilrs.sh logs/cilrs
+#   ./eval_cilrs.sh logs/cilrs --checkpoint model_base.pth   # Evaluate base model
+#   ./eval_cilrs.sh logs/cilrs --checkpoint model_best.pth   # Evaluate trained model
+#   ./eval_cilrs.sh logs/cilrs --debug
+#   ./eval_cilrs.sh logs/cilrs --routes leaderboard/data/debug.xml
 #
 # The model folder should contain:
-#   - model_best.pth (or model_base.pth)
+#   - model_best.pth (or specified checkpoint)
 #   - config.json (optional, will use defaults if missing)
 
 set -e
 
-# Check for --debug flag
+# Parse arguments
 DEBUG_MODE=0
-for arg in "$@"; do
-    if [ "$arg" == "--debug" ]; then
-        DEBUG_MODE=1
-    fi
+CHECKPOINT=""
+ROUTES_FILE="leaderboard/data/debug.xml"
+MODEL_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --debug)
+            DEBUG_MODE=1
+            shift
+            ;;
+        --checkpoint)
+            CHECKPOINT="$2"
+            shift 2
+            ;;
+        --routes)
+            ROUTES_FILE="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$MODEL_PATH" ]; then
+                MODEL_PATH="$1"
+            fi
+            shift
+            ;;
+    esac
 done
 
-# Parse arguments (filter out --debug)
-ARGS=()
-for arg in "$@"; do
-    if [ "$arg" != "--debug" ]; then
-        ARGS+=("$arg")
-    fi
-done
-
-MODEL_PATH="${ARGS[0]:?Error: Model folder required. Usage: ./eval_cilrs.sh <model_folder> [routes_file] [--debug]}"
-ROUTES_FILE="${ARGS[1]:-leaderboard/data/debug.xml}"
-RESULTS_DIR="./eval_results_cilrs"
+if [ -z "$MODEL_PATH" ]; then
+    echo "Error: Model folder required."
+    echo "Usage: ./eval_cilrs.sh <model_folder> [--checkpoint <name>] [--routes <file>] [--debug]"
+    exit 1
+fi
 
 # Get absolute paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,10 +86,10 @@ if [ -z "$CARLA_ROOT" ]; then
 fi
 
 echo "=== CILRS Model Evaluation ==="
-echo "Model:   $MODEL_PATH"
-echo "Routes:  $ROUTES_FILE"
-echo "Results: $RESULTS_DIR"
-echo "CARLA:   $CARLA_ROOT"
+echo "Model:      $MODEL_PATH"
+echo "Checkpoint: ${CHECKPOINT:-model_best.pth (default)}"
+echo "Routes:     $ROUTES_FILE"
+echo "CARLA:      $CARLA_ROOT"
 echo ""
 
 # Set up environment
@@ -76,11 +98,19 @@ export SCENARIO_RUNNER_ROOT="${WORK_DIR}/scenario_runner"
 export LEADERBOARD_ROOT="${WORK_DIR}/leaderboard"
 export PYTHONPATH="${CARLA_ROOT}/PythonAPI/carla/:${SCENARIO_RUNNER_ROOT}:${LEADERBOARD_ROOT}:${WORK_DIR}:${PYTHONPATH}"
 
-# Create results directory
-mkdir -p "$RESULTS_DIR"
+# Create results directory - separate folder per checkpoint
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 MODEL_NAME=$(basename "$MODEL_PATH")
-RESULT_FILE="$RESULTS_DIR/result_${MODEL_NAME}_${TIMESTAMP}.json"
+# Get checkpoint name (without .pth extension)
+CKPT_NAME="${CHECKPOINT%.pth}"
+CKPT_NAME="${CKPT_NAME:-model_best}"
+# Results go in: eval_results_cilrs/<model_name>/<checkpoint_name>/
+RESULTS_DIR="./eval_results_cilrs/${MODEL_NAME}/${CKPT_NAME}"
+mkdir -p "$RESULTS_DIR"
+RESULT_FILE="$RESULTS_DIR/result_${TIMESTAMP}.json"
+
+echo "Results:    $RESULTS_DIR"
+echo ""
 
 echo "Checking if CARLA server is running..."
 if ! pgrep -f "CarlaUE4" > /dev/null; then
@@ -99,9 +129,16 @@ echo ""
 # Set up debug mode if requested
 if [ "$DEBUG_MODE" -eq 1 ]; then
     export DEBUG_CHALLENGE=1
-    export SAVE_PATH="$RESULTS_DIR/frames_${MODEL_NAME}_${TIMESTAMP}"
+    export SAVE_PATH="$RESULTS_DIR/frames_${TIMESTAMP}"
     mkdir -p "$SAVE_PATH"
     echo "DEBUG MODE: Saving frames to $SAVE_PATH"
+    echo ""
+fi
+
+# Set checkpoint if specified
+if [ -n "$CHECKPOINT" ]; then
+    export CILRS_CHECKPOINT="$CHECKPOINT"
+    echo "Using checkpoint: $CHECKPOINT"
     echo ""
 fi
 
@@ -120,7 +157,7 @@ echo "Results saved to: $RESULT_FILE"
 if [ "$DEBUG_MODE" -eq 1 ] && [ -d "$SAVE_PATH" ]; then
     FRAME_COUNT=$(ls -1 "$SAVE_PATH"/*.jpg 2>/dev/null | wc -l)
     if [ "$FRAME_COUNT" -gt 0 ]; then
-        VIDEO_PATH="$RESULTS_DIR/video_${MODEL_NAME}_${TIMESTAMP}.mp4"
+        VIDEO_PATH="$RESULTS_DIR/video_${TIMESTAMP}.mp4"
         echo ""
         echo "Creating video from $FRAME_COUNT frames..."
         ffmpeg -y -framerate 20 -pattern_type glob -i "$SAVE_PATH/*.jpg" \

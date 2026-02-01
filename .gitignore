@@ -274,3 +274,5 @@ carla_garage/carla/
 
 carla_garage/cilrs_dataset/
 carla_garage/extracted_frames/
+carla_garage/eval_results_cilrs/
+cilrs_dataset_*

@@ -115,9 +115,11 @@ class CILRSAgent(AutonomousAgent):
     CILRS Agent for CARLA Leaderboard evaluation.
     """
     
-    def setup(self, path_to_conf_file):
+    def setup(self, path_to_conf_file, route_date_string=None, traffic_manager=None):
         """Initialize the agent with model weights."""
         self.track = Track.SENSORS
+        self.route_date_string = route_date_string
+        self.traffic_manager = traffic_manager
         
         # Device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -154,15 +156,23 @@ class CILRSAgent(AutonomousAgent):
             pretrained=False,
         ).to(self.device)
         
-        # Load weights
-        model_path = os.path.join(path_to_conf_file, "model_best.pth")
-        if not os.path.exists(model_path):
-            # Try other common names
-            for name in ["model.pth", "model_base.pth", "checkpoint.pth"]:
-                alt_path = os.path.join(path_to_conf_file, name)
-                if os.path.exists(alt_path):
-                    model_path = alt_path
-                    break
+        # Load weights - check env var, config, or use defaults
+        checkpoint_name = os.environ.get('CILRS_CHECKPOINT', None)
+        if checkpoint_name is None:
+            checkpoint_name = self.config.get("checkpoint", None)
+        
+        if checkpoint_name:
+            model_path = os.path.join(path_to_conf_file, checkpoint_name)
+        else:
+            # Default: try model_best.pth first
+            model_path = os.path.join(path_to_conf_file, "model_best.pth")
+            if not os.path.exists(model_path):
+                # Try other common names
+                for name in ["model.pth", "model_base.pth", "checkpoint.pth"]:
+                    alt_path = os.path.join(path_to_conf_file, name)
+                    if os.path.exists(alt_path):
+                        model_path = alt_path
+                        break
         
         if os.path.exists(model_path):
             print(f"Loading weights from: {model_path}")
@@ -219,8 +229,16 @@ class CILRSAgent(AutonomousAgent):
         rgb_tensor = self.transform(rgb).unsqueeze(0).to(self.device)
         
         # Get speed (m/s)
-        speed = input_data['speed'][1]['speed']
+        speed_raw = input_data['speed'][1]['speed']
+        speed = max(0.0, speed_raw)  # Ensure non-negative
         speed_tensor = torch.tensor([[speed / 30.0]], dtype=torch.float32, device=self.device)
+        
+        # Debug: print speed every 20 frames
+        if not hasattr(self, '_speed_debug_counter'):
+            self._speed_debug_counter = 0
+        self._speed_debug_counter += 1
+        if self._speed_debug_counter % 20 == 0:
+            print(f"[CILRS] Frame {self.frame_count}: raw_speed={speed_raw:.3f}, speed={speed:.3f}")
         
         # Get navigation command from route
         command = self._get_navigation_command()
@@ -240,11 +258,43 @@ class CILRSAgent(AutonomousAgent):
         throttle = np.clip(throttle, 0.0, 1.0)
         brake = np.clip(brake, 0.0, 1.0)
         
+        # CRITICAL: Throttle and brake are mutually exclusive in CARLA
+        # Even tiny brake values can prevent movement
+        if throttle > brake:
+            brake = 0.0  # Clear brake if we want to accelerate
+        elif brake > throttle:
+            throttle = 0.0  # Clear throttle if we want to brake
+        
+        # Boost throttle when stationary
+        if speed < 1.0 and brake < 0.1:
+            throttle = max(throttle, 0.5)
+            brake = 0.0
+        elif speed < 5.0 and throttle > 0.01 and brake < 0.1:
+            throttle = max(throttle, 0.3)
+            brake = 0.0
+        
+        # CARLA needs a few frames to initialize physics
+        # Apply brake during initial frames like TF++ does
+        if self.frame_count < 5:
+            control = carla.VehicleControl()
+            control.steer = 0.0
+            control.throttle = 0.0
+            control.brake = 1.0
+            control.hand_brake = False
+            control.reverse = False
+            control.manual_gear_shift = False
+            if self.debug and self.save_path:
+                self._save_debug_frame(rgb, speed, command, 0.0, 0.0, 1.0)
+            return control
+        
         # Create control
         control = carla.VehicleControl()
         control.steer = steer
         control.throttle = throttle
         control.brake = brake
+        control.hand_brake = False
+        control.reverse = False
+        control.manual_gear_shift = False
         
         # Save debug visualization
         if self.debug and self.save_path:
@@ -329,6 +379,6 @@ class CILRSAgent(AutonomousAgent):
         self._route = list(zip(global_plan_world_coord, 
                                [wp[1] for wp in global_plan_gps]))
     
-    def destroy(self):
+    def destroy(self, results=None):
         """Cleanup."""
         pass
