@@ -61,6 +61,7 @@ function App() {
   const [gameLoaded, setGameLoaded] = useState(false)
   const [gameStatus, setGameStatus] = useState('connecting') // 'connecting' | 'collecting' | 'disconnected'
   const [timeRemaining, setTimeRemaining] = useState(null) // seconds remaining
+  const [currentScenario, setCurrentScenario] = useState(null)
   const inputRef = useRef(null)
   const gameCanvasRef = useRef(null)
 
@@ -301,6 +302,7 @@ function App() {
                 onLoaded={() => setGameLoaded(true)}
                 onStatusChange={setGameStatus}
                 onTimerUpdate={setTimeRemaining}
+                onScenarioChange={setCurrentScenario}
                 walletAddress={walletAddress}
               />
             </div>
@@ -355,7 +357,7 @@ function App() {
             </span>
           </div>
           <div className={`prompt-input ${hasAnimated ? 'no-anim' : ''} ${isFullscreen ? 'hidden' : ''}`}>
-            {aiPrompt}
+            wasd to move. avoid obstacles and drive around.
           </div>
         </>
       )}

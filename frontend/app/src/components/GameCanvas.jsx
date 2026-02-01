@@ -16,7 +16,7 @@ import {
 
 const SESSION_DURATION_MS = 60 * 1000; // 1 minute
 
-const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york city realistic buildings and streets', isFullscreen = false, onLoaded = () => {}, onStatusChange = () => {}, onTimerUpdate = () => {}, walletAddress = '' }, ref) => {
+const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york city realistic buildings and streets', isFullscreen = false, onLoaded = () => {}, onStatusChange = () => {}, onTimerUpdate = () => {}, onScenarioChange = () => {}, walletAddress = '' }, ref) => {
   const wrapperRef = useRef(null);
   const containerRef = useRef(null);
   const videoRef = useRef(null);
@@ -64,8 +64,9 @@ const GameCanvas = forwardRef(({ className = '', apiKey = '', prompt = 'new york
       startScenario(scenario);
       setActiveScenario(scenario);
       setScenarioStatus('playing');
+      onScenarioChange(scenario);
     }
-  }, []);
+  }, [onScenarioChange]);
 
   const handleStartRandomScenario = useCallback(() => {
     const randomScenario = sampleScenarios[Math.floor(Math.random() * sampleScenarios.length)];
